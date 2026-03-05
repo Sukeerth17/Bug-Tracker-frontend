@@ -1,0 +1,122 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 215 28% 17%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 215 28% 17%;
+
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 57%;
+
+    --accent: 210 20% 94%;
+    --accent-foreground: 215 28% 17%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 239 84% 67%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 222 47% 11%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-muted: 215 16% 47%;
+
+    --nav-width: 240px;
+    --nav-width-collapsed: 60px;
+    --header-height: 56px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
+
+@layer utilities {
+  .font-mono-ticket {
+    font-family: 'Space Mono', monospace;
+  }
+  .status-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors duration-150;
+  }
+  .status-todo {
+    @apply bg-muted text-muted-foreground;
+  }
+  .status-in-progress {
+    background-color: hsl(38 92% 50% / 0.15);
+    color: hsl(38 92% 40%);
+  }
+  .status-in-review {
+    background-color: hsl(239 84% 67% / 0.15);
+    color: hsl(239 84% 60%);
+  }
+  .status-done {
+    background-color: hsl(142 71% 45% / 0.15);
+    color: hsl(142 71% 35%);
+  }
+  .priority-critical {
+    color: hsl(0 84% 60%);
+  }
+  .priority-high {
+    color: hsl(0 72% 51%);
+  }
+  .priority-medium {
+    color: hsl(38 92% 50%);
+  }
+  .priority-low {
+    color: hsl(217 91% 60%);
+  }
+  .dept-website {
+    @apply bg-primary/15 text-primary;
+  }
+  .dept-mobile {
+    background-color: hsl(280 67% 60% / 0.15);
+    color: hsl(280 67% 50%);
+  }
+  .dept-backend {
+    background-color: hsl(142 71% 45% / 0.15);
+    color: hsl(142 71% 35%);
+  }
+  .dept-devops {
+    background-color: hsl(38 92% 50% / 0.15);
+    color: hsl(38 92% 40%);
+  }
+}
