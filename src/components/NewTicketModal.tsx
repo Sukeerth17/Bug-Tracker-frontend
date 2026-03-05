@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { X, CloudUpload } from 'lucide-react';
 import { useTickets } from '@/contexts/TicketContext';
-import { users, currentUser, departments, statusLabels, priorityLabels, typeLabels } from '@/data/mockData';
-import type { TicketStatus, TicketPriority, TicketType, Department } from '@/data/mockData';
+import { departments, statusLabels, priorityLabels, typeLabels } from '@/data/models';
+import type { TicketStatus, TicketPriority, TicketType, Department } from '@/data/models';
 
 interface NewTicketModalProps {
   open: boolean;
@@ -11,7 +11,7 @@ interface NewTicketModalProps {
 }
 
 const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModalProps) => {
-  const { createTicket } = useTickets();
+  const { createTicket, users, currentUser } = useTickets();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState<Department>('Website');
@@ -53,10 +53,10 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    createTicket({
+    await createTicket({
       title: title.trim(),
       description,
       department,

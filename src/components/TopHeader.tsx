@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Bell, X, User, Settings, LogOut } from 'lucide-react';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { currentUser } from '@/data/mockData';
 import { useTickets } from '@/contexts/TicketContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,8 @@ interface TopHeaderProps {
 
 const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeaderProps) => {
   const navigate = useNavigate();
-  const { tickets, setSelectedTicket } = useTickets();
+  const { tickets, setSelectedTicket, currentUser } = useTickets();
+  const { logout } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -205,7 +206,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
               </button>
               <div className="border-t my-1" />
               <button
-                onClick={() => { setUserMenuOpen(false); navigate('/login'); }}
+                onClick={() => { setUserMenuOpen(false); logout(); navigate('/login'); }}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="h-4 w-4" />

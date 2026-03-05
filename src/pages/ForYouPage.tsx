@@ -1,11 +1,10 @@
 import React from 'react';
 import { useTickets } from '@/contexts/TicketContext';
-import { currentUser } from '@/data/mockData';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar } from '@/components/TicketBadges';
 import { format } from 'date-fns';
 
 const ForYouPage = () => {
-  const { tickets, setSelectedTicket } = useTickets();
+  const { tickets, setSelectedTicket, currentUser } = useTickets();
   const myTickets = tickets.filter(t => t.assignee?.id === currentUser.id);
 
   return (

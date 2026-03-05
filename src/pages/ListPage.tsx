@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
-import { statusLabels } from '@/data/mockData';
-import type { TicketStatus } from '@/data/mockData';
+import { statusLabels } from '@/data/models';
+import type { TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { TicketStatus, TicketPriority, TicketType, Department, statusLabels, priorityLabels, typeLabels } from '@/data/mockData';
+import { TicketStatus, TicketPriority, TicketType, Department, statusLabels, priorityLabels, typeLabels } from '@/data/models';
 import { Bug, CheckSquare, Bookmark, Zap, ChevronsUp, ChevronUp, Equal, ChevronDown } from 'lucide-react';
 
 export const StatusBadge = ({ status, onClick }: { status: TicketStatus; onClick?: () => void }) => {

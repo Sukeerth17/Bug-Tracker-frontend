@@ -1,7 +1,20 @@
-import axios from "axios"
+import axios from 'axios';
+import { getApiBaseUrl, getRequesterUserId } from '@/services/controlApi';
+import { getAuthToken } from '@/services/authStorage';
 
 const api = axios.create({
-  baseURL: "http://localhost:8080/api"
-})
+  baseURL: getApiBaseUrl(),
+});
 
-export default api
+api.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
+  config.headers = config.headers ?? {};
+  config.headers['X-User-Id'] = getRequesterUserId();
+  const token = getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export default api;

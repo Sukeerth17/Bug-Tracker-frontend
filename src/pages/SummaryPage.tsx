@@ -3,8 +3,8 @@ import { CheckCircle2, Pencil, PlusCircle, CalendarClock } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, UserAvatar, DeptBadge } from '@/components/TicketBadges';
-import { statusLabels, departments } from '@/data/mockData';
-import type { Department, TicketStatus } from '@/data/mockData';
+import { statusLabels, departments } from '@/data/models';
+import type { Department, TicketStatus } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +25,7 @@ const statusColors: Record<TicketStatus, string> = {
 };
 
 const SummaryPage = () => {
-  const { tickets, allActivity, setSelectedTicket } = useTickets();
+  const { tickets, summaryTickets, allActivity, setSelectedTicket } = useTickets();
   const [rangeIdx, setRangeIdx] = useState(3); // default "1 Week"
   const [deptFilter, setDeptFilter] = useState<Department | 'All'>('All');
 
@@ -33,9 +33,9 @@ const SummaryPage = () => {
   const cutoff = new Date(Date.now() - range.days * 86400000);
 
   const filtered = useMemo(() => {
-    if (deptFilter === 'All') return tickets;
-    return tickets.filter(tk => tk.department === deptFilter);
-  }, [tickets, deptFilter]);
+    if (deptFilter === 'All') return summaryTickets;
+    return summaryTickets.filter(tk => tk.department === deptFilter);
+  }, [summaryTickets, deptFilter]);
 
   const stats = useMemo(() => {
     const completed = filtered.filter(t => t.status === 'done' && new Date(t.updatedAt) >= cutoff).length;

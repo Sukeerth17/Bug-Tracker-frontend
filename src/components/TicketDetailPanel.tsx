@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { X, MessageSquare, Activity, FileText } from 'lucide-react';
-import { Ticket, statusLabels, currentUser } from '@/data/mockData';
+import { statusLabels } from '@/data/models';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from './TicketBadges';
 import { useTickets } from '@/contexts/TicketContext';
-import type { TicketStatus } from '@/data/mockData';
+import type { TicketStatus } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 

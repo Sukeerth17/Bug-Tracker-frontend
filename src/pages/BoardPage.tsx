@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTickets } from '@/contexts/TicketContext';
 import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
-import { statusLabels } from '@/data/mockData';
-import type { TicketStatus, Ticket } from '@/data/mockData';
+import { statusLabels } from '@/data/models';
+import type { TicketStatus, Ticket } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle2 } from 'lucide-react';
 

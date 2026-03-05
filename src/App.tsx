@@ -14,22 +14,47 @@ import BoardPage from "@/pages/BoardPage";
 import ForYouPage from "@/pages/ForYouPage";
 import RecentPage from "@/pages/RecentPage";
 import StarredPage from "@/pages/StarredPage";
+import ControlApiPage from "@/pages/ControlApiPage";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
+import ForgotPassword from "@/pages/ForgotPassword";
+import VerifyOTP from "@/pages/VerifyOTP";
 import NotFound from "./pages/NotFound";
+import { TicketProvider } from "@/contexts/TicketContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
 const queryClient = new QueryClient();
+
+function ProtectedApp() {
+  const { isAuthenticated } = useAuth();
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <TicketProvider>
+      <AppLayout />
+    </TicketProvider>
+  );
+}
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <AuthProvider>
 
         <Toaster />
         <Sonner />
 
         <BrowserRouter>
           <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/verify-otp" element={<VerifyOTP />} />
 
-            <Route element={<AppLayout />}>
+            <Route element={<ProtectedApp />}>
 
               <Route
                 path="/"
@@ -65,6 +90,10 @@ function App() {
                 path="/starred"
                 element={<StarredPage />}
               />
+              <Route
+                path="/control-api"
+                element={<ControlApiPage />}
+              />
 
             </Route>
 
@@ -72,6 +101,7 @@ function App() {
 
           </Routes>
         </BrowserRouter>
+        </AuthProvider>
 
       </TooltipProvider>
     </QueryClientProvider>
