@@ -34,8 +34,8 @@ function persistAuth(response: AuthResponse): User {
 
 export const authService = {
   async signup(payload: { name: string; email: string; password: string; avatar: string; role?: 'USER' | 'SUPER_ADMIN' }) {
-    const response = await api.post<AuthResponse>('/auth/signup', payload);
-    return persistAuth(response.data);
+    const response = await api.post<{ message: string }>('/auth/signup', payload);
+    return response.data.message;
   },
 
   async login(payload: { email: string; password: string }) {

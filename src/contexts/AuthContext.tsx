@@ -8,7 +8,7 @@ interface AuthContextType {
   token: string;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (payload: { name: string; email: string; password: string; avatar: string }) => Promise<void>;
+  signup: (payload: { name: string; email: string; password: string; avatar: string }) => Promise<string>;
   logout: () => void;
 }
 
@@ -31,9 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signup = async (payload: { name: string; email: string; password: string; avatar: string }) => {
-    const signedUpUser = await authService.signup(payload);
-    setUser(signedUpUser);
-    setToken(getAuthToken());
+    return authService.signup(payload);
   };
 
   const logout = () => {

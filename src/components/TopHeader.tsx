@@ -25,9 +25,11 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [readNotificationKeys, setReadNotificationKeys] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+  const notificationStorageKey = `ticket.notifications.read.${currentUser.id}.${currentProjectId}`;
 
   // ⌘K shortcut
   useEffect(() => {
@@ -70,6 +72,37 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
 
   // For You tickets
   const myTickets = tickets.filter(t => t.assignee?.id === currentUser.id);
+  const getNotificationKey = (ticketId: string, updatedAt: string) => `${ticketId}:${updatedAt}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(notificationStorageKey);
+      if (!raw) {
+        setReadNotificationKeys(new Set());
+        return;
+      }
+      const parsed = JSON.parse(raw) as string[];
+      setReadNotificationKeys(new Set(Array.isArray(parsed) ? parsed : []));
+    } catch {
+      setReadNotificationKeys(new Set());
+    }
+  }, [notificationStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(notificationStorageKey, JSON.stringify(Array.from(readNotificationKeys)));
+  }, [notificationStorageKey, readNotificationKeys]);
+
+  const unreadTickets = myTickets.filter((ticket) => !readNotificationKeys.has(getNotificationKey(ticket.id, ticket.updatedAt)));
+
+  const markTicketNotificationRead = (ticketId: string, updatedAt: string) => {
+    const key = getNotificationKey(ticketId, updatedAt);
+    setReadNotificationKeys((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  };
 
   return (
     <header
@@ -138,8 +171,8 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         <div className="relative" ref={notifRef}>
           <button onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }} className="relative p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground">
             <Bell className="h-5 w-5" />
-            {myTickets.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">{myTickets.length}</span>
+            {unreadTickets.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">{unreadTickets.length}</span>
             )}
           </button>
 
@@ -148,17 +181,21 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
               <div className="flex items-center justify-between px-4 py-3 border-b">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">For You</span>
-                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{myTickets.length}</span>
+                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadTickets.length}</span>
                 </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {myTickets.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No tickets assigned to you.</p>
+                {unreadTickets.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">No unread notifications.</p>
                 ) : (
-                  myTickets.map(t => (
+                  unreadTickets.map(t => (
                     <button
                       key={t.id}
-                      onClick={() => { setSelectedTicket(t); setNotifOpen(false); }}
+                      onClick={() => {
+                        markTicketNotificationRead(t.id, t.updatedAt);
+                        setSelectedTicket(t);
+                        setNotifOpen(false);
+                      }}
                       className="w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0"
                     >
                       <div className="flex items-center gap-2 mb-1">

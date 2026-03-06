@@ -116,22 +116,23 @@ export const ticketApi = {
     return response.data.map((user) => mapUser(user) as User);
   },
 
-  async getTickets(): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.tickets);
+  async getTickets(projectId: string): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.tickets, { params: { projectId } });
     return response.data.map(mapTicket);
   },
 
-  async getSummary(): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary);
+  async getSummary(projectId: string): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary, { params: { projectId } });
     return response.data.map(mapTicket);
   },
 
-  async getActivity(): Promise<ActivityEvent[]> {
-    const response = await api.get<ApiActivity[]>(API_ENDPOINTS.activity);
+  async getActivity(projectId: string): Promise<ActivityEvent[]> {
+    const response = await api.get<ApiActivity[]>(API_ENDPOINTS.activity, { params: { projectId } });
     return response.data.map(mapActivity);
   },
 
   async createTicket(payload: {
+    projectId: string;
     title: string;
     description: string;
     status: Ticket['status'];
@@ -146,18 +147,20 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
-  async updateStatus(ticketId: string, status: Ticket['status'], changedByUserId: number): Promise<Ticket> {
+  async updateStatus(projectId: string, ticketId: string, status: Ticket['status'], changedByUserId: number): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStatus.replace('{ticketId}', ticketId),
-      { status, changedByUserId }
+      { status, changedByUserId },
+      { params: { projectId } },
     );
     return mapTicket(response.data);
   },
 
-  async updateStar(ticketId: string, starred: boolean, changedByUserId: number): Promise<Ticket> {
+  async updateStar(projectId: string, ticketId: string, starred: boolean, changedByUserId: number): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStar.replace('{ticketId}', ticketId),
-      { starred, changedByUserId }
+      { starred, changedByUserId },
+      { params: { projectId } },
     );
     return mapTicket(response.data);
   },

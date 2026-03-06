@@ -4,6 +4,7 @@ export interface ProjectItem {
 }
 
 const PROJECTS_KEY = 'ticket.projects';
+const ACTIVE_PROJECT_KEY = 'ticket.activeProjectId';
 
 function slugify(name: string): string {
   return name
@@ -55,4 +56,32 @@ export function addProject(name: string): ProjectItem {
 
 export function getFirstProjectId(): string {
   return getProjects()[0].id;
+}
+
+export function setActiveProjectId(projectId: string) {
+  localStorage.setItem(ACTIVE_PROJECT_KEY, projectId);
+}
+
+export function getActiveProjectId(): string {
+  const stored = localStorage.getItem(ACTIVE_PROJECT_KEY);
+  if (stored && getProjects().some((project) => project.id === stored)) {
+    return stored;
+  }
+  const fallback = getFirstProjectId();
+  setActiveProjectId(fallback);
+  return fallback;
+}
+
+export function getProjectIdFromPathname(pathname: string): string | null {
+  const match = pathname.match(/^\/space\/([^/]+)\//);
+  return match?.[1] || null;
+}
+
+export function resolveProjectId(pathname: string): string {
+  const fromPath = getProjectIdFromPathname(pathname);
+  if (fromPath) {
+    setActiveProjectId(fromPath);
+    return fromPath;
+  }
+  return getActiveProjectId();
 }

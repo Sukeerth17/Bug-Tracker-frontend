@@ -12,16 +12,19 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState('US');
   const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage('');
     setError('');
     setLoading(true);
     try {
-      await signup({ name, email, avatar, password });
-      navigate('/space/sp1/board');
+      const msg = await signup({ name, email, avatar, password });
+      setMessage(msg);
+      navigate('/verify-otp', { state: { email, purpose: 'signup' } });
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Signup failed');
     } finally {
@@ -54,6 +57,7 @@ const Signup = () => {
           <label className="text-xs font-medium text-muted-foreground">Password</label>
           <Input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Minimum 8 characters" required minLength={8} />
         </div>
+        {message && <p className="text-xs text-emerald-600">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Creating...' : 'Create Account'}

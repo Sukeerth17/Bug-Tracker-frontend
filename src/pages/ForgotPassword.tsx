@@ -20,7 +20,7 @@ const ForgotPassword = () => {
     try {
       const msg = await authService.forgotPassword(email);
       setMessage(msg);
-      navigate('/verify-otp', { state: { email } });
+      navigate('/verify-otp', { state: { email, purpose: 'reset' } });
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Unable to send OTP');
     } finally {
