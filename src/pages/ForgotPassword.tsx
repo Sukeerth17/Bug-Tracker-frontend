@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthLayout from '@/components/AuthLayout';
 import { authService } from '@/services/authService';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -29,10 +31,13 @@ const ForgotPassword = () => {
   return (
     <AuthLayout title="Forgot Password" subtitle="Generate OTP to reset password" footerText="Remembered it?" footerLinkText="Login" footerLinkTo="/login">
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Email" className="h-10 w-full rounded-md border px-3 text-sm" required />
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@company.com" required />
+        </div>
         {message && <p className="text-xs text-emerald-600">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <button disabled={loading} className="h-10 w-full rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">{loading ? 'Sending...' : 'Send OTP'}</button>
+        <Button type="submit" disabled={loading} className="w-full">{loading ? 'Sending...' : 'Send OTP'}</Button>
       </form>
     </AuthLayout>
   );

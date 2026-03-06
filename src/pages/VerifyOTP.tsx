@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from '@/components/AuthLayout';
 import { authService } from '@/services/authService';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const VerifyOTP = () => {
   const location = useLocation();
@@ -33,12 +35,21 @@ const VerifyOTP = () => {
   return (
     <AuthLayout title="Verify OTP" subtitle="Enter OTP and set new password" footerText="Back to" footerLinkText="Login" footerLinkTo="/login">
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Email" className="h-10 w-full rounded-md border px-3 text-sm" required />
-        <input value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-digit OTP" className="h-10 w-full rounded-md border px-3 text-sm" required />
-        <input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder="New password (min 8)" className="h-10 w-full rounded-md border px-3 text-sm" required minLength={8} />
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@company.com" required />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">OTP</label>
+          <Input value={otp} onChange={e => setOtp(e.target.value)} placeholder="6-digit OTP" required />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">New Password</label>
+          <Input value={newPassword} onChange={e => setNewPassword(e.target.value)} type="password" placeholder="Minimum 8 characters" required minLength={8} />
+        </div>
         {message && <p className="text-xs text-emerald-600">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <button disabled={loading} className="h-10 w-full rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">{loading ? 'Verifying...' : 'Verify OTP & Reset'}</button>
+        <Button type="submit" disabled={loading} className="w-full">{loading ? 'Verifying...' : 'Verify OTP & Reset'}</Button>
       </form>
     </AuthLayout>
   );

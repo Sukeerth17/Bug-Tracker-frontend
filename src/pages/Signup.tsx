@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AuthLayout from '@/components/AuthLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -36,14 +38,26 @@ const Signup = () => {
       footerLinkTo="/login"
     >
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="Name" className="h-10 w-full rounded-md border px-3 text-sm" required />
-        <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Email" className="h-10 w-full rounded-md border px-3 text-sm" required />
-        <input value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="Avatar initials (e.g. SA)" className="h-10 w-full rounded-md border px-3 text-sm" required />
-        <input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Password (min 8)" className="h-10 w-full rounded-md border px-3 text-sm" required minLength={8} />
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Name</label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" required />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Email</label>
+          <Input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="you@company.com" required />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Avatar Initials</label>
+          <Input value={avatar} onChange={e => setAvatar(e.target.value)} placeholder="SA" required />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Password</label>
+          <Input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Minimum 8 characters" required minLength={8} />
+        </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <button disabled={loading} className="h-10 w-full rounded-md bg-primary text-primary-foreground text-sm font-medium disabled:opacity-60">
+        <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Creating...' : 'Create Account'}
-        </button>
+        </Button>
       </form>
     </AuthLayout>
   );
