@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
-import { statusLabels } from '@/data/models';
-import type { TicketStatus } from '@/data/models';
+import { priorityLabels, statusLabels } from '@/data/models';
+import type { TicketPriority, TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -12,12 +12,15 @@ import autoTable from 'jspdf-autotable';
 type SortKey = 'title' | 'status' | 'priority' | 'created' | 'updated' | 'dueDate';
 
 const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+const statusOrder: Record<TicketStatus, number> = { 'todo': 0, 'in-progress': 1, 'in-review': 2, 'done': 3 };
 
 const ListPage = () => {
   const { tickets, setSelectedTicket, updateTicketStatus } = useTickets();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('created');
   const [sortAsc, setSortAsc] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | TicketPriority>('all');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -25,10 +28,13 @@ const ListPage = () => {
   const filtered = useMemo(() => {
     let t = [...tickets];
     if (search) t = t.filter(tk => tk.title.toLowerCase().includes(search.toLowerCase()) || tk.id.toLowerCase().includes(search.toLowerCase()));
+    if (statusFilter !== 'all') t = t.filter(tk => tk.status === statusFilter);
+    if (priorityFilter !== 'all') t = t.filter(tk => tk.priority === priorityFilter);
     t.sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
         case 'title': cmp = a.title.localeCompare(b.title); break;
+        case 'status': cmp = statusOrder[a.status] - statusOrder[b.status]; break;
         case 'priority': cmp = priorityOrder[a.priority] - priorityOrder[b.priority]; break;
         case 'created': cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break;
         case 'updated': cmp = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(); break;
@@ -38,7 +44,7 @@ const ListPage = () => {
       return sortAsc ? cmp : -cmp;
     });
     return t;
-  }, [tickets, search, sortKey, sortAsc]);
+  }, [tickets, search, statusFilter, priorityFilter, sortKey, sortAsc]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
@@ -99,6 +105,26 @@ const ListPage = () => {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Filter tickets…" className="h-8 w-56 pl-8 pr-3 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setStatusFilter(e.target.value as 'all' | TicketStatus); setPage(0); }}
+            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All Status</option>
+            {Object.entries(statusLabels).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => { setPriorityFilter(e.target.value as 'all' | TicketPriority); setPage(0); }}
+            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All Priority</option>
+            {Object.entries(priorityLabels).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -113,7 +139,7 @@ const ListPage = () => {
                 <th className={thCls} onClick={() => toggleSort('title')}>Work {sortKey === 'title' && (sortAsc ? '↑' : '↓')}</th>
                 <th className={thCls}>Assignee</th>
                 <th className={thCls}>Reporter</th>
-                <th className={thCls}>Status</th>
+                <th className={thCls} onClick={() => toggleSort('status')}>Status {sortKey === 'status' && (sortAsc ? '↑' : '↓')}</th>
                 <th className={thCls} onClick={() => toggleSort('priority')}>Priority {sortKey === 'priority' && (sortAsc ? '↑' : '↓')}</th>
                 <th className={thCls} onClick={() => toggleSort('created')}>Created {sortKey === 'created' && (sortAsc ? '↑' : '↓')}</th>
                 <th className={thCls} onClick={() => toggleSort('updated')}>Updated {sortKey === 'updated' && (sortAsc ? '↑' : '↓')}</th>
@@ -165,7 +191,6 @@ const ListPage = () => {
 
         {/* Pagination + Export */}
         <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-muted-foreground">
-          <span>Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}</span>
           <div className="flex items-center gap-2">
             <button onClick={exportPDF} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium hover:bg-accent transition-colors">
               <Download className="h-3.5 w-3.5" />
@@ -178,6 +203,9 @@ const ListPage = () => {
             <span>{page + 1} / {totalPages || 1}</span>
             <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
           </div>
+          <span>
+            Showing {filtered.length === 0 ? 0 : (page * pageSize + 1)}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
+          </span>
         </div>
       </div>
     </div>
