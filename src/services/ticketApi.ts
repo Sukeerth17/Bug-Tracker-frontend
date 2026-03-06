@@ -43,6 +43,7 @@ interface ApiTicket {
   starred: boolean;
   createdAt: string;
   updatedAt: string;
+  attachments?: string[];
   comments: ApiComment[];
   activity: ApiActivity[];
 }
@@ -95,6 +96,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
     starred: ticket.starred,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,
+    attachments: ticket.attachments || [],
     comments: (ticket.comments || []).map((comment) => ({
       id: comment.id,
       user: (mapUser(comment.user) as User),
@@ -142,6 +144,7 @@ export const ticketApi = {
     assigneeId: number | null;
     reporterId: number;
     dueDate: string | null;
+    attachments: string[];
   }): Promise<Ticket> {
     const response = await api.post<ApiTicket>(API_ENDPOINTS.tickets, payload);
     return mapTicket(response.data);

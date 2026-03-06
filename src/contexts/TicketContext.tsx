@@ -100,6 +100,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
       assigneeId: data.assignee ? Number(data.assignee.id) : null,
       reporterId: Number(currentUser.id),
       dueDate: data.dueDate,
+      attachments: data.attachments,
     });
     await refreshAll();
   }, [currentProjectId, currentUser.id, refreshAll]);

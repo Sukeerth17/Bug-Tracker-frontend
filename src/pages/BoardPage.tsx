@@ -5,7 +5,7 @@ import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/co
 import { statusLabels } from '@/data/models';
 import type { TicketStatus, Ticket } from '@/data/models';
 import { cn } from '@/lib/utils';
-import { Plus, CheckCircle2 } from 'lucide-react';
+import { Plus, CheckCircle2, Paperclip } from 'lucide-react';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
@@ -77,6 +77,12 @@ const BoardPage = () => {
                               <div className="flex items-center gap-1">
                                 <TypeIcon type={ticket.type} />
                                 <span className="font-mono text-[10px] text-muted-foreground">{ticket.id}</span>
+                                {ticket.attachments.length > 0 && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                    <Paperclip className="h-3 w-3" />
+                                    {ticket.attachments.length}
+                                  </span>
+                                )}
                               </div>
                               {ticket.assignee ? (
                                 <UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} />

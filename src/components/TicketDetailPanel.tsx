@@ -10,6 +10,7 @@ import { formatDistanceToNow, format } from 'date-fns';
 const TicketDetailPanel = () => {
   const { selectedTicket, setSelectedTicket, updateTicketStatus } = useTickets();
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
+  const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
 
   if (!selectedTicket) return null;
 
@@ -107,6 +108,25 @@ const TicketDetailPanel = () => {
                   <div className="flex items-center gap-1.5 mt-1"><TypeIcon type={ticket.type} /><span className="text-sm capitalize">{ticket.type}</span></div>
                 </div>
               </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Attachments</label>
+                {ticket.attachments.length === 0 ? (
+                  <p className="text-sm mt-1 text-muted-foreground">No attachments</p>
+                ) : (
+                  <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {ticket.attachments.map((attachment, index) => (
+                      <button
+                        key={`${ticket.id}-attachment-${index}`}
+                        type="button"
+                        onClick={() => setPreviewAttachment(attachment)}
+                        className="h-20 rounded-md overflow-hidden border"
+                      >
+                        <img src={attachment} alt={`Attachment ${index + 1}`} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -148,6 +168,20 @@ const TicketDetailPanel = () => {
           )}
         </div>
       </div>
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewAttachment(null)}>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img src={previewAttachment} alt="Attachment preview" className="max-h-[90vh] max-w-full rounded-lg shadow-2xl" />
+            <button
+              type="button"
+              onClick={() => setPreviewAttachment(null)}
+              className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-card border text-foreground flex items-center justify-center"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };

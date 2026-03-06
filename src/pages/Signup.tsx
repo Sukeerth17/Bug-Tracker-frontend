@@ -4,6 +4,7 @@ import AuthLayout from '@/components/AuthLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Eye, EyeOff } from 'lucide-react';
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -12,6 +13,7 @@ const Signup = () => {
   const [email, setEmail] = useState('');
   const [avatar, setAvatar] = useState('US');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -55,7 +57,17 @@ const Signup = () => {
         </div>
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Password</label>
-          <Input value={password} onChange={e => setPassword(e.target.value)} type="password" placeholder="Minimum 8 characters" required minLength={8} />
+          <div className="relative">
+            <Input value={password} onChange={e => setPassword(e.target.value)} type={showPassword ? 'text' : 'password'} placeholder="Minimum 8 characters" required minLength={8} className="pr-10" />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         {message && <p className="text-xs text-emerald-600">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}

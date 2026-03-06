@@ -44,6 +44,7 @@ export interface Ticket {
   starred: boolean;
   createdAt: string;
   updatedAt: string;
+  attachments: string[];
   comments: Comment[];
   activity: ActivityEvent[];
 }

@@ -5,7 +5,7 @@ import { priorityLabels, statusLabels } from '@/data/models';
 import type { TicketPriority, TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Plus, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Plus, Search, ChevronLeft, ChevronRight, Download, Paperclip } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -154,6 +154,12 @@ const ListPage = () => {
                     <div className="flex items-center gap-2">
                       <TypeIcon type={ticket.type} />
                       <span className="font-mono text-xs text-muted-foreground">{ticket.id}</span>
+                      {ticket.attachments.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                          <Paperclip className="h-3 w-3" />
+                          {ticket.attachments.length}
+                        </span>
+                      )}
                       <button onClick={() => setSelectedTicket(ticket)} className="text-sm hover:text-primary hover:underline transition-colors truncate max-w-xs text-left">{ticket.title}</button>
                     </div>
                   </td>

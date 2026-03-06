@@ -25,6 +25,14 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [attachError, setAttachError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const readFileAsDataUrl = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+
   React.useEffect(() => {
     if (open) {
       setStatus(defaultStatus);
@@ -36,11 +44,12 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
   if (!open) return null;
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files) return;
     setAttachError('');
     const remaining = 5 - attachments.length;
     const fileArr = Array.from(files).slice(0, remaining);
+    const nextAttachments: { url: string; name: string }[] = [];
 
     for (const file of fileArr) {
       if (!file.type.startsWith('image/')) {
@@ -51,16 +60,16 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         setAttachError('Max 5MB per file.');
         continue;
       }
-      const url = URL.createObjectURL(file);
-      setAttachments(prev => [...prev, { url, name: file.name }]);
+      const url = await readFileAsDataUrl(file);
+      nextAttachments.push({ url, name: file.name });
+    }
+    if (nextAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...nextAttachments]);
     }
   };
 
   const removeAttachment = (idx: number) => {
-    setAttachments(prev => {
-      URL.revokeObjectURL(prev[idx].url);
-      return prev.filter((_, i) => i !== idx);
-    });
+    setAttachments(prev => prev.filter((_, i) => i !== idx));
     if (previewAttachment && previewAttachment.url === attachments[idx]?.url) {
       setPreviewAttachment(null);
     }
@@ -79,6 +88,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       assignee: users.find(u => u.id === assigneeId) || null,
       reporter: currentUser,
       dueDate: dueDate || null,
+      attachments: attachments.map((file) => file.url),
     });
     onClose();
     setTitle(''); setDescription(''); setDepartment('Website'); setType('task'); setPriority('medium'); setAssigneeId(''); setStatus('todo'); setDueDate('');
