@@ -14,7 +14,6 @@ import BoardPage from "@/pages/BoardPage";
 import ForYouPage from "@/pages/ForYouPage";
 import RecentPage from "@/pages/RecentPage";
 import StarredPage from "@/pages/StarredPage";
-import ControlApiPage from "@/pages/ControlApiPage";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import ForgotPassword from "@/pages/ForgotPassword";
@@ -89,10 +88,6 @@ function App() {
               <Route
                 path="/starred"
                 element={<StarredPage />}
-              />
-              <Route
-                path="/control-api"
-                element={<ControlApiPage />}
               />
 
             </Route>

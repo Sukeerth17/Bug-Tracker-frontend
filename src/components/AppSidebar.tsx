@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   User, Clock, Bug, Settings, HelpCircle,
-  LayoutDashboard, List, Kanban, SlidersHorizontal,
+  LayoutDashboard, List, Kanban,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,6 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const mainNav = [
     { label: 'For You', icon: User, to: '/for-you' },
     { label: 'Recent', icon: Clock, to: '/recent' },
-    { label: 'Control API', icon: SlidersHorizontal, to: '/control-api' },
   ];
 
   const spaceNav = [
