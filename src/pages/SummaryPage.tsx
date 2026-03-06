@@ -28,6 +28,8 @@ const SummaryPage = () => {
   const { tickets, summaryTickets, allActivity, setSelectedTicket } = useTickets();
   const [rangeIdx, setRangeIdx] = useState(3); // default "1 Week"
   const [deptFilter, setDeptFilter] = useState<Department | 'All'>('All');
+  const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
+  const [listStatusFilter, setListStatusFilter] = useState<TicketStatus | 'All'>('All');
 
   const range = timeRanges[rangeIdx];
   const cutoff = new Date(Date.now() - range.days * 86400000);
@@ -58,6 +60,13 @@ const SummaryPage = () => {
 
   const totalTickets = filtered.length;
   const recentActivity = allActivity.slice(0, 15);
+  const filteredTicketList = useMemo(() => {
+    return summaryTickets.filter((ticket) => {
+      if (listDeptFilter !== 'All' && ticket.department !== listDeptFilter) return false;
+      if (listStatusFilter !== 'All' && ticket.status !== listStatusFilter) return false;
+      return true;
+    });
+  }, [summaryTickets, listDeptFilter, listStatusFilter]);
 
   const selectCls = "h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30";
 
@@ -167,6 +176,82 @@ const SummaryPage = () => {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      <div className="bg-card rounded-xl border p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <h3 className="text-sm font-semibold">Tickets by Department & Status</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={listDeptFilter}
+              onChange={e => setListDeptFilter(e.target.value as Department | 'All')}
+              className={selectCls}
+            >
+              <option value="All">All Departments</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <select
+              value={listStatusFilter}
+              onChange={e => setListStatusFilter(e.target.value as TicketStatus | 'All')}
+              className={selectCls}
+            >
+              <option value="All">All Status</option>
+              {Object.entries(statusLabels).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Department</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Assignee</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTicketList.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
+                    No tickets found for selected filters.
+                  </td>
+                </tr>
+              )}
+              {filteredTicketList.map((ticket) => (
+                <tr key={ticket.id} className="border-b hover:bg-accent/40 transition-colors">
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => setSelectedTicket(ticket)}
+                      className="text-left hover:text-primary hover:underline"
+                    >
+                      <span className="font-mono text-[11px] text-muted-foreground mr-2">{ticket.id}</span>
+                      <span className="text-sm">{ticket.title}</span>
+                    </button>
+                  </td>
+                  <td className="px-3 py-2"><DeptBadge department={ticket.department} /></td>
+                  <td className="px-3 py-2"><StatusBadge status={ticket.status} /></td>
+                  <td className="px-3 py-2">
+                    {ticket.assignee ? (
+                      <div className="flex items-center gap-2">
+                        <UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} />
+                        <span className="text-xs">{ticket.assignee.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Unassigned</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
