@@ -192,6 +192,11 @@ const ListPage = () => {
         {/* Pagination + Export */}
         <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
+            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+            <span>{page + 1} / {totalPages || 1}</span>
+            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+          </div>
+          <div className="flex items-center gap-2">
             <button onClick={exportPDF} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium hover:bg-accent transition-colors">
               <Download className="h-3.5 w-3.5" />
               Export PDF
@@ -199,13 +204,10 @@ const ListPage = () => {
             <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} className="h-7 rounded border bg-background px-2 text-xs">
               {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}
             </select>
-            <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-            <span>{page + 1} / {totalPages || 1}</span>
-            <button disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+            <span>
+              Showing {filtered.length === 0 ? 0 : (page * pageSize + 1)}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
+            </span>
           </div>
-          <span>
-            Showing {filtered.length === 0 ? 0 : (page * pageSize + 1)}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}
-          </span>
         </div>
       </div>
     </div>
