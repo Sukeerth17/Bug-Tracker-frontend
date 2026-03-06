@@ -29,9 +29,9 @@ Frontend runs on: `http://localhost:5173`
 - Preview build: `npm run preview`
 
 ## Backend Integration
-- API base URL is configured from `src/control-api.ts` and `src/services/controlApi.ts`.
+- API base URL is configured from `src/control-api.ts``src/services/controlApi.ts`.
 - Default API base URL: `http://localhost:8080/api`
-- JWT token is stored after login/signup and sent in `Authorization` header.
+- JWT token is stored after login/signupsent in `Authorization` header.
 - Ticket APIs use requester identity with `X-User-Id`.
 
 ## Main Routes
@@ -47,10 +47,10 @@ Frontend runs on: `http://localhost:5173`
 - `/starred`
 
 ## Auth + Setup Flow
-1. Start backend (`ticket-backend`) and MySQL.
-2. Open frontend and sign up/login.
-3. Set API base URL and requester user ID in `src/services/controlApi.ts` if needed.
-4. Create users/tickets and use the app normally.
+1. Start backend (`ticket-backend`)MySQL.
+2. Open frontendsign up/login.
+3. Set API base URLrequester user ID in `src/services/controlApi.ts` if needed.
+4. Create users/ticketsuse the app normally.
 
 ## Notes
 - No mock data is used.

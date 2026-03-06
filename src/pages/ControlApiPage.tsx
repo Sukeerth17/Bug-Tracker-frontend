@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { API_ENDPOINTS, getApiBaseUrl, getRequesterUserId, setApiBaseUrl, setRequesterUserId } from '@/services/controlApi';
+import { API_ENDPOINTS, getApiBaseUrl, getRequesterUserId, setApiBaseUrl, setRequesterUserId } from '@/services/controlapi';
 import { useTickets } from '@/contexts/TicketContext';
 import { ticketApi } from '@/services/ticketApi';
 

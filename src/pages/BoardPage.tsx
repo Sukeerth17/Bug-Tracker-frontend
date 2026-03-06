@@ -92,7 +92,10 @@ const BoardPage = () => {
                   </div>
 
                   {/* Add button */}
-                  <button className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-t">
+                  <button
+                    onClick={() => window.dispatchEvent(new CustomEvent('ticket:new', { detail: { status: col.id } }))}
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-t"
+                  >
                     <Plus className="h-3.5 w-3.5" />
                     Create
                   </button>

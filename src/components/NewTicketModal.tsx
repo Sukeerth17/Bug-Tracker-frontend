@@ -21,8 +21,18 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [status, setStatus] = useState<TicketStatus>(defaultStatus);
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
+  const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string } | null>(null);
   const [attachError, setAttachError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (open) {
+      setStatus(defaultStatus);
+      if (!assigneeId && users.length > 0) {
+        setAssigneeId(users[0].id);
+      }
+    }
+  }, [open, defaultStatus, assigneeId, users]);
 
   if (!open) return null;
 
@@ -51,11 +61,14 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       URL.revokeObjectURL(prev[idx].url);
       return prev.filter((_, i) => i !== idx);
     });
+    if (previewAttachment && previewAttachment.url === attachments[idx]?.url) {
+      setPreviewAttachment(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !assigneeId) return;
     await createTicket({
       title: title.trim(),
       description,
@@ -70,6 +83,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
     onClose();
     setTitle(''); setDescription(''); setDepartment('Website'); setType('task'); setPriority('medium'); setAssigneeId(''); setStatus('todo'); setDueDate('');
     setAttachments([]); setAttachError('');
+    setPreviewAttachment(null);
   };
 
   const selectCls = "h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full";
@@ -120,9 +134,9 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             <div>
               <label className={labelCls}>Assignee</label>
               <select value={assigneeId} onChange={e => setAssigneeId(e.target.value)} className={selectCls}>
-                <option value="">Unassigned</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
+              {users.length === 0 && <p className="text-xs text-destructive mt-1">Create users first before creating tickets.</p>}
             </div>
             <div>
               <label className={labelCls}>Due Date</label>
@@ -149,7 +163,9 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
               <div className="flex flex-wrap gap-2 mt-2">
                 {attachments.map((a, i) => (
                   <div key={i} className="relative h-20 w-20 rounded-md overflow-hidden border">
-                    <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+                    <button type="button" onClick={() => setPreviewAttachment(a)} className="h-full w-full">
+                      <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
+                    </button>
                     <button type="button" onClick={() => removeAttachment(i)} className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]">×</button>
                   </div>
                 ))}
@@ -159,10 +175,24 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
-            <button type="submit" className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">Create Ticket</button>
+            <button type="submit" disabled={users.length === 0 || !assigneeId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">Create Ticket</button>
           </div>
         </form>
       </div>
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewAttachment(null)}>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img src={previewAttachment.url} alt={previewAttachment.name} className="max-h-[90vh] max-w-full rounded-lg shadow-2xl" />
+            <button
+              type="button"
+              onClick={() => setPreviewAttachment(null)}
+              className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-card border text-foreground flex items-center justify-center"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

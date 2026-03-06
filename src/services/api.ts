@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getApiBaseUrl, getRequesterUserId } from '@/services/controlApi';
+import { getApiBaseUrl, getRequesterUserId } from '@/services/controlapi';
 import { getAuthToken } from '@/services/authStorage';
 
 const api = axios.create({

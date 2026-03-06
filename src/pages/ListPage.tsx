@@ -6,6 +6,8 @@ import type { TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type SortKey = 'title' | 'status' | 'priority' | 'created' | 'updated' | 'dueDate';
 
@@ -46,24 +48,35 @@ const ListPage = () => {
     else { setSortKey(key); setSortAsc(true); }
   };
 
-  const exportCSV = () => {
-    const headers = ['Ticket ID', 'Title', 'Department', 'Type', 'Assignee', 'Reporter', 'Status', 'Priority', 'Created Date', 'Updated Date', 'Due Date'];
-    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-    const fmtDate = (d: string | null) => d ? format(new Date(d), 'yyyy-MM-dd HH:mm') : '';
+  const exportPDF = () => {
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(12);
+    doc.text(`Tickets Export - ${format(new Date(), 'yyyy-MM-dd')}`, 14, 14);
+
+    const headers = [['Ticket ID', 'Title', 'Department', 'Type', 'Assignee', 'Reporter', 'Status', 'Priority', 'Created', 'Updated', 'Due']];
     const rows = filtered.map(t => [
-      t.id, escape(t.title), t.department, t.type,
-      t.assignee?.name || 'Unassigned', t.reporter.name,
-      statusLabels[t.status], t.priority,
-      fmtDate(t.createdAt), fmtDate(t.updatedAt), fmtDate(t.dueDate),
-    ].join(','));
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tickets-export-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+      t.id,
+      t.title,
+      t.department,
+      t.type,
+      t.assignee?.name || 'Unassigned',
+      t.reporter?.name || 'Hidden',
+      statusLabels[t.status],
+      t.priority,
+      t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : '',
+      t.updatedAt ? format(new Date(t.updatedAt), 'yyyy-MM-dd') : '',
+      t.dueDate ? format(new Date(t.dueDate), 'yyyy-MM-dd') : '',
+    ]);
+
+    autoTable(doc, {
+      head: headers,
+      body: rows,
+      startY: 20,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [59, 130, 246] },
+    });
+
+    doc.save(`tickets-export-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
   const thCls = "px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none";
@@ -75,6 +88,13 @@ const ListPage = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">List</h1>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('ticket:new', { detail: { status: 'todo' } }))}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create
+          </button>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} placeholder="Filter tickets…" className="h-8 w-56 pl-8 pr-3 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
@@ -147,9 +167,9 @@ const ListPage = () => {
         <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-muted-foreground">
           <span>Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} of {filtered.length}</span>
           <div className="flex items-center gap-2">
-            <button onClick={exportCSV} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium hover:bg-accent transition-colors">
+            <button onClick={exportPDF} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium hover:bg-accent transition-colors">
               <Download className="h-3.5 w-3.5" />
-              Export CSV
+              Export PDF
             </button>
             <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }} className="h-7 rounded border bg-background px-2 text-xs">
               {[10, 25, 50].map(n => <option key={n} value={n}>{n} / page</option>)}

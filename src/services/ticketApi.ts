@@ -1,6 +1,6 @@
 import api from '@/services/api';
 import { ActivityEvent, Ticket, User } from '@/data/models';
-import { API_ENDPOINTS } from '@/services/controlApi';
+import { API_ENDPOINTS } from '@/services/controlapi';
 
 interface ApiUser {
   id: number;

@@ -1,5 +1,5 @@
 import api from '@/services/api';
-import { setRequesterUserId } from '@/services/controlApi';
+import { setRequesterUserId } from '@/services/controlapi';
 import { clearAuthStorage, setAuthToken, setAuthUser } from '@/services/authStorage';
 import { User } from '@/data/models';
 

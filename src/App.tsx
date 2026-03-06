@@ -21,6 +21,7 @@ import VerifyOTP from "@/pages/VerifyOTP";
 import NotFound from "./pages/NotFound";
 import { TicketProvider } from "@/contexts/TicketContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { getFirstProjectId } from "@/services/projectControl";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,10 @@ function ProtectedApp() {
       <AppLayout />
     </TicketProvider>
   );
+}
+
+function HomeRedirect() {
+  return <Navigate to={`/space/${getFirstProjectId()}/board`} replace />;
 }
 
 function App() {
@@ -57,7 +62,7 @@ function App() {
 
               <Route
                 path="/"
-                element={<Navigate to="/space/sp1/board" replace />}
+                element={<HomeRedirect />}
               />
 
               <Route

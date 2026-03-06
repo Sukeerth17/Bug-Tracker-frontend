@@ -2,9 +2,10 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   User, Clock, Bug, Settings, HelpCircle,
-  LayoutDashboard, List, Kanban,
+  LayoutDashboard, List, Kanban, Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { addProject, getProjects } from '@/services/projectControl';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -14,7 +15,10 @@ interface AppSidebarProps {
 const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const spaceId = 'sp1';
+  const [projects, setProjects] = React.useState(getProjects());
+  const parts = location.pathname.split('/');
+  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || 'sp1');
+  const currentProject = projects.find((project) => project.id === currentProjectId) || projects[0];
 
   const mainNav = [
     { label: 'For You', icon: User, to: '/for-you' },
@@ -22,10 +26,19 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   ];
 
   const spaceNav = [
-    { label: 'Summary', icon: LayoutDashboard, to: `/space/${spaceId}/summary` },
-    { label: 'Board', icon: Kanban, to: `/space/${spaceId}/board` },
-    { label: 'List', icon: List, to: `/space/${spaceId}/list` },
+    { label: 'Summary', icon: LayoutDashboard, to: `/space/${currentProjectId}/summary` },
+    { label: 'Board', icon: Kanban, to: `/space/${currentProjectId}/board` },
+    { label: 'List', icon: List, to: `/space/${currentProjectId}/list` },
   ];
+
+  const handleAddProject = () => {
+    const name = window.prompt('Enter project name');
+    if (!name || !name.trim()) return;
+    const project = addProject(name);
+    const next = getProjects();
+    setProjects(next);
+    navigate(`/space/${project.id}/board`);
+  };
 
   return (
     <aside
@@ -37,7 +50,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       {/* Logo — navigates to Board */}
       <div
         className={cn('flex items-center h-14 px-4 border-b border-sidebar-border cursor-pointer', collapsed && 'justify-center px-2')}
-        onClick={() => navigate(`/space/${spaceId}/board`)}
+        onClick={() => navigate(`/space/${currentProjectId}/board`)}
       >
         {collapsed ? (
           <span className="text-lg font-bold text-sidebar-primary">T</span>
@@ -78,13 +91,35 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
             </p>
           )}
           <div className="mb-1">
-            <div className={cn(
-              'flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-sidebar-foreground',
-              collapsed && 'justify-center px-2'
-            )}>
-              <span className="h-2.5 w-2.5 rounded-sm shrink-0 bg-sidebar-primary" />
-              {!collapsed && <span>Ticket Hub</span>}
-            </div>
+            {!collapsed && (
+              <div className="px-2 mb-2 space-y-1">
+                {projects.map(project => (
+                  <button
+                    key={project.id}
+                    onClick={() => navigate(`/space/${project.id}/board`)}
+                    className={cn(
+                      'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors',
+                      project.id === currentProjectId ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    )}
+                  >
+                    <span className="h-2 w-2 rounded-sm shrink-0 bg-sidebar-primary" />
+                    <span className="truncate">{project.name}</span>
+                  </button>
+                ))}
+                <button
+                  onClick={handleAddProject}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Project</span>
+                </button>
+              </div>
+            )}
+            {collapsed && (
+              <button onClick={handleAddProject} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
             <div className="space-y-0.5 ml-1">
               {spaceNav.map(item => (
                 <NavLink

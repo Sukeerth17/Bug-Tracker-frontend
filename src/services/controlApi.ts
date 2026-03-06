@@ -23,7 +23,7 @@ export function setApiBaseUrl(url: string) {
   localStorage.setItem(API_CONTROL_KEYS.baseUrl, url.trim() || 'http://localhost:8080/api');
 }
 
-export function getRequesterUserId(): string {
+export function getRequesterUserId(): string { 
   return localStorage.getItem(API_CONTROL_KEYS.requesterUserId) || '1';
 }
 

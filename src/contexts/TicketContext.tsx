@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityEvent, Ticket, TicketStatus, User } from '@/data/models';
 import { ticketApi } from '@/services/ticketApi';
-import { getRequesterUserId } from '@/services/controlApi';
+import { getRequesterUserId } from '@/services/controlapi';
 
 interface TicketContextType {
   tickets: Ticket[];

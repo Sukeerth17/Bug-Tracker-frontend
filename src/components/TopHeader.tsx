@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Bell, X, User, Settings, LogOut } from 'lucide-react';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
@@ -16,8 +16,11 @@ interface TopHeaderProps {
 
 const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { tickets, setSelectedTicket, currentUser } = useTickets();
   const { logout } = useAuth();
+  const parts = location.pathname.split('/');
+  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : 'sp1';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -106,7 +109,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                     setSelectedTicket(t);
                     setSearchOpen(false);
                     setSearchQuery('');
-                    navigate('/space/sp1/list');
+                    navigate(`/space/${currentProjectId}/list`);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-accent/50 transition-colors text-left border-b last:border-b-0"
                 >
