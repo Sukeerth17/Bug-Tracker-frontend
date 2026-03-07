@@ -39,6 +39,7 @@ export interface Ticket {
   department: Department;
   type: TicketType;
   assignee: User | null;
+  assignees: User[];
   reporter: User;
   dueDate: string | null;
   starred: boolean;

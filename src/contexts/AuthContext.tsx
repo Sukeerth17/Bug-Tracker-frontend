@@ -8,6 +8,7 @@ interface AuthContextType {
   token: string;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (idToken: string) => Promise<void>;
   signup: (payload: { name: string; email: string; password: string; avatar: string }) => Promise<string>;
   logout: () => void;
 }
@@ -30,6 +31,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setToken(getAuthToken());
   };
 
+  const googleLogin = async (idToken: string) => {
+    const loggedInUser = await authService.googleLogin(idToken);
+    setUser(loggedInUser);
+    setToken(getAuthToken());
+  };
+
   const signup = async (payload: { name: string; email: string; password: string; avatar: string }) => {
     return authService.signup(payload);
   };
@@ -45,6 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     token,
     isAuthenticated: Boolean(user && token),
     login,
+    googleLogin,
     signup,
     logout,
   }), [user, token]);

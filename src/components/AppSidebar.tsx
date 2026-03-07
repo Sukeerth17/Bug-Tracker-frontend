@@ -2,10 +2,12 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   User, Clock, Settings, HelpCircle,
-  LayoutDashboard, List, Kanban, Plus, ChevronDown, ChevronRight,
+  LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { addProject, getProjectIdFromPathname, getProjects, setActiveProjectId } from '@/services/projectControl';
+import { getProjectIdFromPathname, setActiveProjectId } from '@/services/projectControl';
+import { projectApi, ProjectItem } from '@/services/projectApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -15,10 +17,16 @@ interface AppSidebarProps {
 const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [projects, setProjects] = React.useState(getProjects());
+  const { user } = useAuth();
+  const [projects, setProjects] = React.useState<ProjectItem[]>([]);
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
+
   const parts = location.pathname.split('/');
-  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || 'sp1');
+  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || '');
+
+  React.useEffect(() => {
+    projectApi.getProjects().then(setProjects).catch(() => setProjects([]));
+  }, [location.pathname]);
 
   React.useEffect(() => {
     const projectId = getProjectIdFromPathname(location.pathname);
@@ -28,6 +36,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   }, [location.pathname]);
 
   React.useEffect(() => {
+    if (!currentProjectId) return;
     setExpandedProjects((prev) => {
       const next = new Set(prev);
       next.add(currentProjectId);
@@ -39,15 +48,6 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     { label: 'For You', icon: User, to: '/for-you' },
     { label: 'Recent', icon: Clock, to: '/recent' },
   ];
-
-  const handleAddProject = () => {
-    const name = window.prompt('Enter project name');
-    if (!name || !name.trim()) return;
-    const project = addProject(name);
-    const next = getProjects();
-    setProjects(next);
-    navigate(`/space/${project.id}/board`);
-  };
 
   const toggleProjectExpanded = (projectId: string) => {
     setExpandedProjects((prev) => {
@@ -68,10 +68,9 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
         collapsed ? 'w-[60px]' : 'w-[240px]'
       )}
     >
-      {/* Logo — navigates to Board */}
       <div
         className={cn('flex items-center h-14 px-4 border-b border-sidebar-border cursor-pointer', collapsed && 'justify-center px-2')}
-        onClick={() => navigate(`/space/${currentProjectId}/board`)}
+        onClick={() => navigate(currentProjectId ? `/space/${currentProjectId}/board` : '/for-you')}
       >
         {collapsed ? (
           <span className="text-lg font-bold text-sidebar-primary">T</span>
@@ -83,7 +82,6 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
         )}
       </div>
 
-      {/* Main nav */}
       <nav className="flex-1 overflow-y-auto py-3">
         <div className="space-y-0.5 px-2">
           {mainNav.map(item => (
@@ -104,7 +102,6 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
           ))}
         </div>
 
-        {/* Space section */}
         <div className="mt-6 px-2">
           {!collapsed && (
             <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted">
@@ -175,36 +172,54 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                     )}
                   </div>
                 ))}
-                <button
-                  onClick={handleAddProject}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Project</span>
-                </button>
+
+                {user?.role === 'SUPER_ADMIN' && (
+                  <>
+                    <button
+                      onClick={() => navigate('/admin/projects')}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    >
+                      <FolderPlus className="h-3.5 w-3.5" />
+                      <span>Create Project</span>
+                    </button>
+                    <button
+                      onClick={() => navigate('/admin/users')}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      <span>User Management</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
             {collapsed && (
               <div className="space-y-1">
-                <button onClick={handleAddProject} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-                <button onClick={() => navigate(`/space/${currentProjectId}/summary`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                <button onClick={() => currentProjectId && navigate(`/space/${currentProjectId}/summary`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
                   <LayoutDashboard className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => navigate(`/space/${currentProjectId}/board`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                <button onClick={() => currentProjectId && navigate(`/space/${currentProjectId}/board`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
                   <Kanban className="h-3.5 w-3.5" />
                 </button>
-                <button onClick={() => navigate(`/space/${currentProjectId}/list`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                <button onClick={() => currentProjectId && navigate(`/space/${currentProjectId}/list`)} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
                   <List className="h-3.5 w-3.5" />
                 </button>
+                {user?.role === 'SUPER_ADMIN' && (
+                  <>
+                    <button onClick={() => navigate('/admin/projects')} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                      <FolderPlus className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => navigate('/admin/users')} className="flex items-center justify-center w-full py-1 text-sidebar-muted hover:text-sidebar-foreground">
+                      <Users className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
         </div>
       </nav>
 
-      {/* Bottom */}
       <div className="border-t border-sidebar-border py-2 px-2 space-y-0.5">
         <button className={cn('flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors', collapsed && 'justify-center px-2')}>
           <Settings className="h-4 w-4 shrink-0" />

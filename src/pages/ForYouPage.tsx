@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 
 const ForYouPage = () => {
   const { tickets, setSelectedTicket, currentUser } = useTickets();
-  const myTickets = tickets.filter(t => t.assignee?.id === currentUser.id);
+  const myTickets = tickets.filter(t => (t.assignees || []).some((assignee) => assignee.id === currentUser.id));
 
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto">

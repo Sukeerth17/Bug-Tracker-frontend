@@ -38,6 +38,7 @@ interface ApiTicket {
   department: Ticket['department'];
   type: Ticket['type'];
   assignee: ApiUser | null;
+  assignees?: ApiUser[];
   reporter: ApiUser | null;
   dueDate: string | null;
   starred: boolean;
@@ -90,6 +91,9 @@ function mapTicket(ticket: ApiTicket): Ticket {
     role: 'USER',
   };
 
+  const mappedAssignees = (ticket.assignees || []).map((assignee) => mapUser(assignee) as User);
+  const mappedPrimaryAssignee = mapUser(ticket.assignee) || (mappedAssignees[0] || null);
+
   return {
     id: ticket.id,
     title: ticket.title,
@@ -98,7 +102,8 @@ function mapTicket(ticket: ApiTicket): Ticket {
     priority: ticket.priority,
     department: ticket.department,
     type: ticket.type,
-    assignee: mapUser(ticket.assignee),
+    assignee: mappedPrimaryAssignee,
+    assignees: mappedAssignees,
     reporter: mapUser(ticket.reporter) || fallbackReporter,
     dueDate: ticket.dueDate,
     starred: ticket.starred,
@@ -121,8 +126,12 @@ export const ticketApi = {
     return mapUser(response.data) as User;
   },
 
-  async getUsers(): Promise<User[]> {
-    const response = await api.get<ApiUser[]>(API_ENDPOINTS.users);
+  async deleteUser(userId: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.userById.replace('{userId}', userId));
+  },
+
+  async getUsers(projectId?: string): Promise<User[]> {
+    const response = await api.get<ApiUser[]>(API_ENDPOINTS.users, { params: projectId ? { projectId } : undefined });
     return response.data.map((user) => mapUser(user) as User);
   },
 
@@ -150,7 +159,7 @@ export const ticketApi = {
     priority: Ticket['priority'];
     department: Ticket['department'];
     type: Ticket['type'];
-    assigneeId: number | null;
+    assigneeIds: number[];
     reporterId: number;
     dueDate: string | null;
     attachments: string[];
@@ -172,6 +181,15 @@ export const ticketApi = {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStar.replace('{ticketId}', ticketId),
       { starred },
+      { params: { projectId } },
+    );
+    return mapTicket(response.data);
+  },
+
+  async updateAssignees(projectId: string, ticketId: string, assigneeIds: number[]): Promise<Ticket> {
+    const response = await api.patch<ApiTicket>(
+      API_ENDPOINTS.ticketAssignees.replace('{ticketId}', ticketId),
+      { assigneeIds },
       { params: { projectId } },
     );
     return mapTicket(response.data);

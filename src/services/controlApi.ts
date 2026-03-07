@@ -9,10 +9,19 @@ export const API_ENDPOINTS = {
   tickets: '/tickets',
   ticketById: '/tickets/{ticketId}',
   ticketStatus: '/tickets/{ticketId}/status',
+  ticketAssignees: '/tickets/{ticketId}/assignees',
   ticketStar: '/tickets/{ticketId}/star',
   ticketComments: '/tickets/{ticketId}/comments',
   activity: '/tickets/activity',
   summary: '/tickets/summary',
+  projects: '/projects',
+  projectById: '/projects/{projectId}',
+  googleOnboardUser: '/users/google-onboard',
+  userById: '/users/{userId}',
+  notifications: '/notifications',
+  notificationRead: '/notifications/{notificationId}/read',
+  notificationStream: '/notifications/stream',
+  dashboardSummary: '/dashboard/summary',
 };
 
 export function getApiBaseUrl(): string {

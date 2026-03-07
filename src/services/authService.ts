@@ -43,6 +43,11 @@ export const authService = {
     return persistAuth(response.data);
   },
 
+  async googleLogin(idToken: string) {
+    const response = await api.post<AuthResponse>('/auth/google/login', { idToken });
+    return persistAuth(response.data);
+  },
+
   async forgotPassword(email: string) {
     const response = await api.post<{ message: string }>('/auth/forgot-password', { email });
     return response.data.message;

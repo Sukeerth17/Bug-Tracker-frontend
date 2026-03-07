@@ -8,13 +8,20 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus } = useTickets();
+  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, users } = useTickets();
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
-
-  if (!selectedTicket) return null;
+  const [editingAssignees, setEditingAssignees] = useState(false);
+  const [assigneeIdsDraft, setAssigneeIdsDraft] = useState<string[]>([]);
 
   const ticket = selectedTicket;
+  React.useEffect(() => {
+    if (!ticket) return;
+    setAssigneeIdsDraft(ticket.assignees.map((assignee) => assignee.id));
+    setEditingAssignees(false);
+  }, [ticket?.id, ticket?.assignees]);
+
+  if (!ticket) return null;
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: FileText },
     { id: 'activity' as const, label: 'Activity', icon: Activity },
@@ -79,9 +86,53 @@ const TicketDetailPanel = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground">Assignee</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    {ticket.assignee ? <><UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} /><span className="text-sm">{ticket.assignee.name}</span></> : <><GhostAvatar /><span className="text-sm text-muted-foreground">Unassigned</span></>}
+                  <label className="text-xs font-medium text-muted-foreground">Assignees</label>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {ticket.assignees.length > 0 ? (
+                      ticket.assignees.map((assignee) => (
+                        <span key={assignee.id} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1">
+                          <UserAvatar name={assignee.name} avatar={assignee.avatar} />
+                          <span className="text-xs">{assignee.name}</span>
+                        </span>
+                      ))
+                    ) : (
+                      <><GhostAvatar /><span className="text-sm text-muted-foreground">Unassigned</span></>
+                    )}
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {editingAssignees ? (
+                      <>
+                        <select
+                          value={assigneeIdsDraft}
+                          onChange={(e) => setAssigneeIdsDraft(Array.from(e.target.selectedOptions, (option) => option.value))}
+                          className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          multiple
+                        >
+                          {users.map((user) => (
+                            <option key={user.id} value={user.id}>{user.name}</option>
+                          ))}
+                        </select>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs"
+                            onClick={async () => {
+                              await updateTicketAssignees(ticket.id, assigneeIdsDraft);
+                              setEditingAssignees(false);
+                            }}
+                          >
+                            Save
+                          </button>
+                          <button type="button" className="h-8 px-3 rounded-md border text-xs" onClick={() => setEditingAssignees(false)}>
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button type="button" className="h-8 px-3 rounded-md border text-xs" onClick={() => setEditingAssignees(true)}>
+                        Edit Assignees
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div>

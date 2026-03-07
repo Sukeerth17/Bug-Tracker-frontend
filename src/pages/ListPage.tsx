@@ -65,7 +65,7 @@ const ListPage = () => {
       t.title,
       t.department,
       t.type,
-      t.assignee?.name || 'Unassigned',
+      t.assignees.length > 0 ? t.assignees.map((assignee) => assignee.name).join(', ') : 'Unassigned',
       t.reporter?.name || 'Hidden',
       statusLabels[t.status],
       t.priority,
@@ -165,7 +165,12 @@ const ListPage = () => {
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
-                      {ticket.assignee ? <><UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} /><span className="text-xs hidden xl:inline">{ticket.assignee.name}</span></> : <GhostAvatar />}
+                      {ticket.assignees.length > 0 ? (
+                        <>
+                          <UserAvatar name={ticket.assignees[0].name} avatar={ticket.assignees[0].avatar} />
+                          <span className="text-xs hidden xl:inline">{ticket.assignees[0].name}{ticket.assignees.length > 1 ? ` +${ticket.assignees.length - 1}` : ''}</span>
+                        </>
+                      ) : <GhostAvatar />}
                     </div>
                   </td>
                   <td className="px-3 py-2">

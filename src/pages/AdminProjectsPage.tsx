@@ -1,0 +1,108 @@
+import React from 'react';
+import { projectApi, ProjectItem } from '@/services/projectApi';
+
+const AdminProjectsPage = () => {
+  const [projects, setProjects] = React.useState<ProjectItem[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [name, setName] = React.useState('');
+  const [description, setDescription] = React.useState('');
+  const [startDate, setStartDate] = React.useState('');
+  const [metadataJson, setMetadataJson] = React.useState('');
+  const [error, setError] = React.useState('');
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      setProjects(await projectApi.getProjects());
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      await projectApi.createProject({
+        name: name.trim(),
+        description: description.trim() || undefined,
+        startDate: startDate || undefined,
+        metadataJson: metadataJson.trim() || undefined,
+      });
+      setName('');
+      setDescription('');
+      setStartDate('');
+      setMetadataJson('');
+      await load();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to create project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (projectId: string) => {
+    if (!window.confirm('Delete this project permanently? All related tickets will be deleted.')) return;
+    setSaving(true);
+    setError('');
+    try {
+      await projectApi.deleteProject(projectId);
+      await load();
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to delete project');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <h1 className="text-xl font-semibold">Create Project</h1>
+      <form onSubmit={handleCreate} className="bg-card rounded-xl border p-4 space-y-3">
+        <div className="grid md:grid-cols-2 gap-3">
+          <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Project name *" required />
+          <input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="date" />
+          <input value={description} onChange={(e) => setDescription(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2" placeholder="Description" />
+          <textarea value={metadataJson} onChange={(e) => setMetadataJson(e.target.value)} className="min-h-20 rounded-md border bg-background px-3 py-2 text-sm md:col-span-2" placeholder="Metadata JSON (optional)" />
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <button disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{saving ? 'Saving...' : 'Create Project'}</button>
+      </form>
+
+      <div className="bg-card rounded-xl border p-4">
+        <h2 className="text-sm font-semibold mb-3">Existing Projects</h2>
+        {loading ? (
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        ) : (
+          <div className="space-y-2">
+            {projects.map((project) => (
+              <div key={project.id} className="flex items-center justify-between border rounded-md p-3">
+                <div>
+                  <p className="text-sm font-medium">{project.name}</p>
+                  <p className="text-xs text-muted-foreground">{project.id}</p>
+                </div>
+                <button
+                  onClick={() => handleDelete(project.id)}
+                  disabled={saving}
+                  className="h-8 px-3 rounded-md border text-xs text-destructive hover:bg-destructive/10"
+                >
+                  Delete
+                </button>
+              </div>
+            ))}
+            {projects.length === 0 && <p className="text-sm text-muted-foreground">No projects found.</p>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AdminProjectsPage;

@@ -236,10 +236,10 @@ const SummaryPage = () => {
                   <td className="px-3 py-2"><DeptBadge department={ticket.department} /></td>
                   <td className="px-3 py-2"><StatusBadge status={ticket.status} /></td>
                   <td className="px-3 py-2">
-                    {ticket.assignee ? (
+                    {ticket.assignees.length > 0 ? (
                       <div className="flex items-center gap-2">
-                        <UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} />
-                        <span className="text-xs">{ticket.assignee.name}</span>
+                        <UserAvatar name={ticket.assignees[0].name} avatar={ticket.assignees[0].avatar} />
+                        <span className="text-xs">{ticket.assignees[0].name}{ticket.assignees.length > 1 ? ` +${ticket.assignees.length - 1}` : ''}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">Unassigned</span>

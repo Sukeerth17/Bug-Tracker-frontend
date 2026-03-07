@@ -15,13 +15,13 @@ import ForYouPage from "@/pages/ForYouPage";
 import RecentPage from "@/pages/RecentPage";
 import StarredPage from "@/pages/StarredPage";
 import Login from "@/pages/Login";
-import Signup from "@/pages/Signup";
 import ForgotPassword from "@/pages/ForgotPassword";
 import VerifyOTP from "@/pages/VerifyOTP";
+import AdminProjectsPage from "@/pages/AdminProjectsPage";
+import AdminUsersPage from "@/pages/AdminUsersPage";
 import NotFound from "./pages/NotFound";
 import { TicketProvider } from "@/contexts/TicketContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { getFirstProjectId } from "@/services/projectControl";
 
 const queryClient = new QueryClient();
 
@@ -39,7 +39,14 @@ function ProtectedApp() {
 }
 
 function HomeRedirect() {
-  return <Navigate to={`/space/${getFirstProjectId()}/board`} replace />;
+  return <Navigate to="/for-you" replace />;
+}
+
+function SuperAdminRoute({ children }: { children: any }) {
+  const { user, isAuthenticated } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (user?.role !== 'SUPER_ADMIN') return <Navigate to="/for-you" replace />;
+  return children;
 }
 
 function App() {
@@ -54,7 +61,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<Signup />} />
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<VerifyOTP />} />
             <Route path="/verify-otp" element={<VerifyOTP />} />
@@ -94,6 +101,16 @@ function App() {
               <Route
                 path="/starred"
                 element={<StarredPage />}
+              />
+
+              <Route
+                path="/admin/projects"
+                element={<SuperAdminRoute><AdminProjectsPage /></SuperAdminRoute>}
+              />
+
+              <Route
+                path="/admin/users"
+                element={<SuperAdminRoute><AdminUsersPage /></SuperAdminRoute>}
               />
 
             </Route>

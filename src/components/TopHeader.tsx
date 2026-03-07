@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Bell, X, User, Settings, LogOut } from 'lucide-react';
+import { Search, Plus, Bell, LogOut } from 'lucide-react';
 import { PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { notificationApi, NotificationItem } from '@/services/notificationApi';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -25,11 +26,10 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [readNotificationKeys, setReadNotificationKeys] = useState<Set<string>>(new Set());
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
-  const notificationStorageKey = `ticket.notifications.read.${currentUser.id}.${currentProjectId}`;
 
   // ⌘K shortcut
   useEffect(() => {
@@ -70,38 +70,26 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
       })
     : [];
 
-  // For You tickets
-  const myTickets = tickets.filter(t => t.assignee?.id === currentUser.id);
-  const getNotificationKey = (ticketId: string, updatedAt: string) => `${ticketId}:${updatedAt}`;
+  useEffect(() => {
+    notificationApi.getNotifications(0, 50)
+      .then(setNotifications)
+      .catch(() => setNotifications([]));
+  }, [currentUser.id]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(notificationStorageKey);
-      if (!raw) {
-        setReadNotificationKeys(new Set());
-        return;
-      }
-      const parsed = JSON.parse(raw) as string[];
-      setReadNotificationKeys(new Set(Array.isArray(parsed) ? parsed : []));
-    } catch {
-      setReadNotificationKeys(new Set());
-    }
-  }, [notificationStorageKey]);
-
-  useEffect(() => {
-    localStorage.setItem(notificationStorageKey, JSON.stringify(Array.from(readNotificationKeys)));
-  }, [notificationStorageKey, readNotificationKeys]);
-
-  const unreadTickets = myTickets.filter((ticket) => !readNotificationKeys.has(getNotificationKey(ticket.id, ticket.updatedAt)));
-
-  const markTicketNotificationRead = (ticketId: string, updatedAt: string) => {
-    const key = getNotificationKey(ticketId, updatedAt);
-    setReadNotificationKeys((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
+    const stream = notificationApi.subscribe((incoming) => {
+      setNotifications((prev) => [incoming, ...prev.filter((item) => item.id !== incoming.id)]);
     });
+    return () => {
+      stream?.close();
+    };
+  }, [currentUser.id]);
+
+  const unreadNotifications = notifications.filter((item) => !item.isRead);
+
+  const markNotificationRead = async (notificationId: number) => {
+    const updated = await notificationApi.markRead(notificationId);
+    setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
   };
 
   return (
@@ -171,8 +159,8 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         <div className="relative" ref={notifRef}>
           <button onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }} className="relative p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground">
             <Bell className="h-5 w-5" />
-            {unreadTickets.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">{unreadTickets.length}</span>
+            {unreadNotifications.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">{unreadNotifications.length}</span>
             )}
           </button>
 
@@ -181,34 +169,38 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
               <div className="flex items-center justify-between px-4 py-3 border-b">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">For You</span>
-                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadTickets.length}</span>
+                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadNotifications.length}</span>
                 </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
-                {unreadTickets.length === 0 ? (
+                {unreadNotifications.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-8">No unread notifications.</p>
                 ) : (
-                  unreadTickets.map(t => (
+                  unreadNotifications.map((notification) => (
                     <button
-                      key={t.id}
-                      onClick={() => {
-                        markTicketNotificationRead(t.id, t.updatedAt);
-                        setSelectedTicket(t);
+                      key={notification.id}
+                      onClick={async () => {
+                        await markNotificationRead(notification.id);
+                        if (notification.ticketId) {
+                          const ticket = tickets.find((item) => item.id === notification.ticketId);
+                          if (ticket) {
+                            setSelectedTicket(ticket);
+                          } else {
+                            navigate('/for-you');
+                          }
+                        }
                         setNotifOpen(false);
                       }}
                       className="w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors border-b last:border-b-0"
                     >
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{t.id}</span>
-                        <span className="text-sm font-medium truncate flex-1">{t.title}</span>
+                        <span className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{notification.ticketId || 'notice'}</span>
+                        <span className="text-sm font-medium truncate flex-1">{notification.ticketTitle || 'Notification'}</span>
                       </div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <DeptBadge department={t.department} />
-                        <StatusBadge status={t.status} />
-                      </div>
+                      <p className="text-xs text-muted-foreground mb-1">{notification.message}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-muted-foreground">Assigned to you</span>
-                        <span className="text-[11px] text-muted-foreground">Updated {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: false })} ago</span>
+                        <span className="text-[11px] text-muted-foreground">{notification.eventType}</span>
+                        <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
                       </div>
                     </button>
                   ))
@@ -236,15 +228,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                 <p className="text-sm font-semibold">{currentUser.name}</p>
                 <p className="text-xs text-muted-foreground">{currentUser.email}</p>
               </div>
-              <button className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent/50 transition-colors">
-                <User className="h-4 w-4 text-muted-foreground" />
-                Profile Settings
-              </button>
-              <button className="w-full flex items-center gap-2 px-4 py-2 text-sm hover:bg-accent/50 transition-colors">
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                Preferences
-              </button>
-              <div className="border-t my-1" />
               <button
                 onClick={() => { setUserMenuOpen(false); logout(); navigate('/login'); }}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"

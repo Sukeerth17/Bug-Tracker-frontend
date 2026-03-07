@@ -84,8 +84,13 @@ const BoardPage = () => {
                                   </span>
                                 )}
                               </div>
-                              {ticket.assignee ? (
-                                <UserAvatar name={ticket.assignee.name} avatar={ticket.assignee.avatar} />
+                              {ticket.assignees.length > 0 ? (
+                                <div className="inline-flex items-center gap-1">
+                                  <UserAvatar name={ticket.assignees[0].name} avatar={ticket.assignees[0].avatar} />
+                                  {ticket.assignees.length > 1 && (
+                                    <span className="text-[10px] text-muted-foreground">+{ticket.assignees.length - 1}</span>
+                                  )}
+                                </div>
                               ) : (
                                 <GhostAvatar />
                               )}
