@@ -11,8 +11,6 @@ const ControlApiPage = () => {
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserAvatar, setNewUserAvatar] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'USER' | 'SUPER_ADMIN'>('USER');
-  const [newUserPassword, setNewUserPassword] = useState('');
 
   const endpointRows = useMemo(
     () => Object.entries(API_ENDPOINTS).map(([name, path]) => ({ name, path })),
@@ -38,13 +36,10 @@ const ControlApiPage = () => {
         name: newUserName.trim(),
         email: newUserEmail.trim(),
         avatar: newUserAvatar.trim(),
-        role: newUserRole,
-        password: newUserPassword.trim() || undefined,
       });
       setNewUserName('');
       setNewUserEmail('');
       setNewUserAvatar('');
-      setNewUserPassword('');
       await refreshAll();
     } finally {
       setSaving(false);
@@ -130,21 +125,6 @@ const ControlApiPage = () => {
             className="h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             placeholder="Avatar initials (e.g. SA)"
           />
-          <input
-            value={newUserPassword}
-            onChange={(e) => setNewUserPassword(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="Password (optional, default ChangeMe@123)"
-            type="password"
-          />
-          <select
-            value={newUserRole}
-            onChange={(e) => setNewUserRole(e.target.value as 'USER' | 'SUPER_ADMIN')}
-            className="h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="USER">USER</option>
-            <option value="SUPER_ADMIN">SUPER_ADMIN</option>
-          </select>
         </div>
         <button
           onClick={handleCreateUser}

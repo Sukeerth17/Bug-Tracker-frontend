@@ -26,7 +26,7 @@ const Signup = () => {
     try {
       const msg = await signup({ name, email, avatar, password });
       setMessage(msg);
-      navigate('/verify-otp', { state: { email, purpose: 'signup' } });
+      navigate('/login');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Signup failed');
     } finally {

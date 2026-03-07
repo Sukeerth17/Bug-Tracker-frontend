@@ -48,6 +48,14 @@ interface ApiTicket {
   activity: ApiActivity[];
 }
 
+interface ApiPage<T> {
+  items: T[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 function mapUser(user: ApiUser | null): User | null {
   if (!user) return null;
   return {
@@ -108,8 +116,8 @@ function mapTicket(ticket: ApiTicket): Ticket {
 }
 
 export const ticketApi = {
-  async createUser(payload: { name: string; email: string; avatar: string; role: 'USER' | 'SUPER_ADMIN'; password?: string }): Promise<User> {
-    const response = await api.post<ApiUser>(API_ENDPOINTS.users, payload);
+  async createUser(payload: { name: string; email: string; avatar: string }): Promise<User> {
+    const response = await api.post<ApiUser>(`${API_ENDPOINTS.users}/google-onboard`, payload);
     return mapUser(response.data) as User;
   },
 
@@ -119,8 +127,9 @@ export const ticketApi = {
   },
 
   async getTickets(projectId: string): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.tickets, { params: { projectId } });
-    return response.data.map(mapTicket);
+    const response = await api.get<ApiTicket[] | ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, { params: { projectId } });
+    const rows = Array.isArray(response.data) ? response.data : (response.data.items || []);
+    return rows.map(mapTicket);
   },
 
   async getSummary(projectId: string): Promise<Ticket[]> {
@@ -153,7 +162,7 @@ export const ticketApi = {
   async updateStatus(projectId: string, ticketId: string, status: Ticket['status'], changedByUserId: number): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStatus.replace('{ticketId}', ticketId),
-      { status, changedByUserId },
+      { status },
       { params: { projectId } },
     );
     return mapTicket(response.data);
@@ -162,7 +171,7 @@ export const ticketApi = {
   async updateStar(projectId: string, ticketId: string, starred: boolean, changedByUserId: number): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStar.replace('{ticketId}', ticketId),
-      { starred, changedByUserId },
+      { starred },
       { params: { projectId } },
     );
     return mapTicket(response.data);
