@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { CheckCircle2, Pencil, PlusCircle, CalendarClock } from 'lucide-react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, Activity as ActivityIcon, ListChecks, CalendarClock } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, UserAvatar, DeptBadge } from '@/components/TicketBadges';
@@ -7,59 +7,80 @@ import { statusLabels, departments } from '@/data/models';
 import type { Department, TicketStatus } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
-
-const timeRanges = [
-  { label: '1 Day', days: 1 },
-  { label: '3 Days', days: 3 },
-  { label: '5 Days', days: 5 },
-  { label: '1 Week', days: 7 },
-  { label: '2 Weeks', days: 14 },
-  { label: '1 Month', days: 30 },
-];
+import { dashboardApi, DashboardSummary } from '@/services/dashboardApi';
+import { useLocation } from 'react-router-dom';
+import { resolveProjectId } from '@/services/projectControl';
 
 const statusColors: Record<TicketStatus, string> = {
-  'todo': '#94a3b8',
+  todo: '#94a3b8',
   'in-progress': '#f59e0b',
   'in-review': '#6366f1',
-  'done': '#22c55e',
+  done: '#22c55e',
 };
 
 const SummaryPage = () => {
   const { tickets, summaryTickets, allActivity, setSelectedTicket } = useTickets();
-  const [rangeIdx, setRangeIdx] = useState(3); // default "1 Week"
+  const location = useLocation();
+  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+
   const [deptFilter, setDeptFilter] = useState<Department | 'All'>('All');
   const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
   const [listStatusFilter, setListStatusFilter] = useState<TicketStatus | 'All'>('All');
+  const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
 
-  const range = timeRanges[rangeIdx];
-  const cutoff = new Date(Date.now() - range.days * 86400000);
+  useEffect(() => {
+    if (!projectId) {
+      setDashboard(null);
+      return;
+    }
+    dashboardApi.getSummary(projectId)
+      .then(setDashboard)
+      .catch(() => setDashboard(null));
+  }, [projectId]);
 
   const filtered = useMemo(() => {
     if (deptFilter === 'All') return summaryTickets;
-    return summaryTickets.filter(tk => tk.department === deptFilter);
+    return summaryTickets.filter((tk) => tk.department === deptFilter);
   }, [summaryTickets, deptFilter]);
 
   const stats = useMemo(() => {
-    const completed = filtered.filter(t => t.status === 'done' && new Date(t.updatedAt) >= cutoff).length;
-    const updated = filtered.filter(t => new Date(t.updatedAt) >= cutoff).length;
-    const created = filtered.filter(t => new Date(t.createdAt) >= cutoff).length;
-    const dueSoon = filtered.filter(t => t.dueDate && new Date(t.dueDate) <= new Date(Date.now() + 7 * 86400000) && t.status !== 'done').length;
+    const total = dashboard?.totalTickets ?? filtered.length;
+    const completed = dashboard?.closedTickets ?? filtered.filter((t) => t.status === 'done').length;
+    const open = dashboard?.openTickets ?? filtered.filter((t) => t.status !== 'done').length;
+    const dueSoon = filtered.filter((t) => t.dueDate && new Date(t.dueDate) <= new Date(Date.now() + 7 * 86400000) && t.status !== 'done').length;
+
     return [
       { label: 'Completed', value: completed, icon: CheckCircle2, color: 'text-success' },
-      { label: 'Updated', value: updated, icon: Pencil, color: 'text-primary' },
-      { label: 'Created', value: created, icon: PlusCircle, color: 'text-info' },
+      { label: 'Open', value: open, icon: ListChecks, color: 'text-primary' },
+      { label: 'Activity', value: allActivity.length, icon: ActivityIcon, color: 'text-info' },
       { label: 'Due Soon', value: dueSoon, icon: CalendarClock, color: 'text-warning' },
+      { label: 'Total', value: total, icon: ListChecks, color: 'text-muted-foreground' },
     ];
-  }, [filtered, cutoff]);
+  }, [dashboard, filtered, allActivity.length]);
 
   const pieData = useMemo(() => {
-    const counts: Record<TicketStatus, number> = { 'todo': 0, 'in-progress': 0, 'in-review': 0, 'done': 0 };
-    filtered.forEach(t => counts[t.status]++);
-    return Object.entries(counts).map(([status, count]) => ({ name: statusLabels[status as TicketStatus], value: count, color: statusColors[status as TicketStatus] }));
-  }, [filtered]);
+    if (dashboard?.byStatus) {
+      return (Object.keys(statusLabels) as TicketStatus[]).map((status) => ({
+        name: statusLabels[status],
+        value: Number(dashboard.byStatus[status] || 0),
+        color: statusColors[status],
+      }));
+    }
 
-  const totalTickets = filtered.length;
+    const counts: Record<TicketStatus, number> = { todo: 0, 'in-progress': 0, 'in-review': 0, done: 0 };
+    filtered.forEach((t) => {
+      counts[t.status] += 1;
+    });
+    return (Object.keys(counts) as TicketStatus[]).map((status) => ({
+      name: statusLabels[status],
+      value: counts[status],
+      color: statusColors[status],
+    }));
+  }, [dashboard, filtered]);
+
+  const totalTickets = pieData.reduce((sum, item) => sum + item.value, 0);
   const recentActivity = allActivity.slice(0, 15);
+
   const filteredTicketList = useMemo(() => {
     return summaryTickets.filter((ticket) => {
       if (listDeptFilter !== 'All' && ticket.department !== listDeptFilter) return false;
@@ -68,33 +89,28 @@ const SummaryPage = () => {
     });
   }, [summaryTickets, listDeptFilter, listStatusFilter]);
 
-  const selectCls = "h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30";
+  const selectCls = 'h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <h1 className="text-xl font-semibold">Summary</h1>
 
-      {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <select value={rangeIdx} onChange={e => setRangeIdx(Number(e.target.value))} className={selectCls}>
-          {timeRanges.map((r, i) => <option key={i} value={i}>{r.label}</option>)}
-        </select>
         <div className="relative flex items-center gap-1">
           {deptFilter !== 'All' && <span className="h-2 w-2 rounded-full bg-primary shrink-0" />}
           <select
             value={deptFilter}
-            onChange={e => setDeptFilter(e.target.value as Department | 'All')}
+            onChange={(e) => setDeptFilter(e.target.value as Department | 'All')}
             className={selectCls}
           >
             <option value="All">All Departments</option>
-            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {stats.map(s => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {stats.map((s) => (
           <div key={s.label} className="bg-card rounded-xl border p-4 flex items-center gap-3">
             <div className={cn('p-2 rounded-lg bg-muted', s.color)}>
               <s.icon className="h-5 w-5" />
@@ -107,9 +123,7 @@ const SummaryPage = () => {
         ))}
       </div>
 
-      {/* Two columns */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Pie chart */}
         <div className="bg-card rounded-xl border p-5">
           <h3 className="text-sm font-semibold mb-4">Status Overview</h3>
           <div className="flex items-center gap-6">
@@ -130,7 +144,7 @@ const SummaryPage = () => {
               </div>
             </div>
             <div className="space-y-2">
-              {pieData.map(d => (
+              {pieData.map((d) => (
                 <div key={d.name} className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
                   <span className="text-xs">{d.name}</span>
@@ -141,11 +155,10 @@ const SummaryPage = () => {
           </div>
         </div>
 
-        {/* Activity feed */}
         <div className="bg-card rounded-xl border p-5">
           <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
           <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-            {recentActivity.map(event => (
+            {recentActivity.map((event) => (
               <div key={event.id} className="flex gap-3 group">
                 <UserAvatar name={event.user.name} avatar={event.user.avatar} />
                 <div className="min-w-0 flex-1">
@@ -155,7 +168,7 @@ const SummaryPage = () => {
                     {event.ticketId && (
                       <button
                         onClick={() => {
-                          const t = tickets.find(tk => tk.id === event.ticketId);
+                          const t = tickets.find((tk) => tk.id === event.ticketId);
                           if (t) setSelectedTicket(t);
                         }}
                         className="ml-1 font-mono text-xs text-primary hover:underline"
@@ -185,15 +198,15 @@ const SummaryPage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <select
               value={listDeptFilter}
-              onChange={e => setListDeptFilter(e.target.value as Department | 'All')}
+              onChange={(e) => setListDeptFilter(e.target.value as Department | 'All')}
               className={selectCls}
             >
               <option value="All">All Departments</option>
-              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
             <select
               value={listStatusFilter}
-              onChange={e => setListStatusFilter(e.target.value as TicketStatus | 'All')}
+              onChange={(e) => setListStatusFilter(e.target.value as TicketStatus | 'All')}
               className={selectCls}
             >
               <option value="All">All Status</option>

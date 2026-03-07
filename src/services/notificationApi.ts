@@ -1,5 +1,5 @@
-import api from '@/services/api';
-import { API_ENDPOINTS, getApiBaseUrl } from '@/services/controlapi';
+﻿import api from '@/services/api';
+import { API_ENDPOINTS, getApiBaseUrl } from '@/services/controlApi';
 import { getAuthToken } from '@/services/authStorage';
 
 export interface NotificationItem {
@@ -26,6 +26,11 @@ export const notificationApi = {
     return response.data.items || [];
   },
 
+  async getUnreadCount(): Promise<number> {
+    const response = await api.get<{ count: number }>(`${API_ENDPOINTS.notifications}/unread-count`);
+    return response.data.count || 0;
+  },
+
   async markRead(notificationId: number): Promise<NotificationItem> {
     const response = await api.patch<NotificationItem>(
       API_ENDPOINTS.notificationRead.replace('{notificationId}', String(notificationId)),
@@ -50,3 +55,4 @@ export const notificationApi = {
     return es;
   },
 };
+

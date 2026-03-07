@@ -1,18 +1,40 @@
-import React from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
-import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar } from '@/components/TicketBadges';
-import { format } from 'date-fns';
+import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge } from '@/components/TicketBadges';
+import { Ticket } from '@/data/models';
+import { useLocation } from 'react-router-dom';
+import { resolveProjectId } from '@/services/projectControl';
+import { ticketApi } from '@/services/ticketApi';
 
 const ForYouPage = () => {
-  const { tickets, setSelectedTicket, currentUser } = useTickets();
-  const myTickets = tickets.filter(t => (t.assignees || []).some((assignee) => assignee.id === currentUser.id));
+  const { setSelectedTicket, currentUser } = useTickets();
+  const location = useLocation();
+  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const [myTickets, setMyTickets] = useState<Ticket[]>([]);
+
+  useEffect(() => {
+    if (!projectId || !currentUser.id) {
+      setMyTickets([]);
+      return;
+    }
+
+    ticketApi.queryTickets(projectId, {
+      assigneeId: Number(currentUser.id),
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: 200,
+    })
+      .then((res) => setMyTickets(res.items))
+      .catch(() => setMyTickets([]));
+  }, [projectId, currentUser.id]);
 
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto">
       <h1 className="text-xl font-semibold">For You</h1>
       <p className="text-sm text-muted-foreground">Tickets assigned to you ({myTickets.length})</p>
       <div className="space-y-2">
-        {myTickets.map(ticket => (
+        {myTickets.map((ticket) => (
           <button
             key={ticket.id}
             onClick={() => setSelectedTicket(ticket)}

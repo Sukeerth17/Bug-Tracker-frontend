@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, Bell, LogOut } from 'lucide-react';
-import { PanelLeftClose, PanelLeft } from 'lucide-react';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,11 +26,11 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
 
-  // ⌘K shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -48,7 +47,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Close on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
@@ -59,26 +57,35 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Search results: active tickets, or done only if exact ID match
   const searchResults = searchQuery.trim()
-    ? tickets.filter(t => {
-        const q = searchQuery.toLowerCase();
-        const matchesQuery = t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
-        if (!matchesQuery) return false;
-        if (t.status === 'done') return t.id.toLowerCase() === q;
-        return true;
-      })
+    ? tickets.filter((t) => {
+      const q = searchQuery.toLowerCase();
+      const matchesQuery = t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
+      if (!matchesQuery) return false;
+      if (t.status === 'done') return t.id.toLowerCase() === q;
+      return true;
+    })
     : [];
 
   useEffect(() => {
-    notificationApi.getNotifications(0, 50)
-      .then(setNotifications)
-      .catch(() => setNotifications([]));
+    Promise.all([
+      notificationApi.getNotifications(0, 50),
+      notificationApi.getUnreadCount(),
+    ])
+      .then(([rows, count]) => {
+        setNotifications(rows);
+        setUnreadCount(count);
+      })
+      .catch(() => {
+        setNotifications([]);
+        setUnreadCount(0);
+      });
   }, [currentUser.id]);
 
   useEffect(() => {
     const stream = notificationApi.subscribe((incoming) => {
       setNotifications((prev) => [incoming, ...prev.filter((item) => item.id !== incoming.id)]);
+      setUnreadCount((prev) => prev + (incoming.isRead ? 0 : 1));
     });
     return () => {
       stream?.close();
@@ -90,6 +97,9 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const markNotificationRead = async (notificationId: number) => {
     const updated = await notificationApi.markRead(notificationId);
     setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+    if (updated.isRead) {
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+    }
   };
 
   return (
@@ -103,19 +113,18 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         {sidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
       </button>
 
-      {/* Search */}
       <div className="flex-1 max-w-xl relative" ref={searchRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search tickets…"
+            placeholder="Search tickets..."
             value={searchQuery}
-            onChange={e => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+            onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
             onFocus={() => setSearchOpen(true)}
             className="w-full h-9 pl-9 pr-16 rounded-lg bg-muted/60 border-0 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">⌘K</kbd>
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">Ctrl+K</kbd>
         </div>
 
         {searchOpen && searchQuery.trim() && (
@@ -123,7 +132,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
             {searchResults.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">No active tickets found.</p>
             ) : (
-              searchResults.map(t => (
+              searchResults.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => {
@@ -145,7 +154,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         )}
       </div>
 
-      {/* Right actions */}
       <div className="flex items-center gap-2">
         <button
           onClick={onNewTicket}
@@ -155,12 +163,11 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
           New Ticket
         </button>
 
-        {/* Notification bell */}
         <div className="relative" ref={notifRef}>
           <button onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }} className="relative p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground">
             <Bell className="h-5 w-5" />
-            {unreadNotifications.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">{unreadNotifications.length}</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1">{unreadCount}</span>
             )}
           </button>
 
@@ -169,7 +176,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
               <div className="flex items-center justify-between px-4 py-3 border-b">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">For You</span>
-                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadNotifications.length}</span>
+                  <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadCount}</span>
                 </div>
               </div>
               <div className="max-h-80 overflow-y-auto">
@@ -213,7 +220,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
           )}
         </div>
 
-        {/* User menu */}
         <div className="relative" ref={userRef}>
           <button
             onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}

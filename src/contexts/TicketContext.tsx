@@ -1,7 +1,7 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityEvent, Department, Ticket, TicketPriority, TicketStatus, TicketType, User } from '@/data/models';
 import { ticketApi } from '@/services/ticketApi';
-import { getRequesterUserId } from '@/services/controlapi';
+import { getRequesterUserId } from '@/services/controlApi';
 import { resolveProjectId } from '@/services/projectControl';
 import { useLocation } from 'react-router-dom';
 
@@ -29,7 +29,7 @@ interface TicketContextType {
     attachments: string[];
   }) => Promise<void>;
   updateTicketAssignees: (id: string, assigneeIds: string[]) => Promise<void>;
-  toggleStar: (id: string) => Promise<void>;
+  addTicketComment: (id: string, text: string) => Promise<void>;
 }
 
 const TicketContext = createContext<TicketContextType | null>(null);
@@ -84,7 +84,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
       setTickets(ticketData);
       setSummaryTickets(summaryData);
       setAllActivity(activityData);
-    } catch (error) {
+    } catch {
       setUsers([]);
       setTickets([]);
       setSummaryTickets([]);
@@ -98,15 +98,35 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
     refreshAll();
   }, [refreshAll]);
 
+  useEffect(() => {
+    if (!currentProjectId || !selectedTicket?.id) {
+      return;
+    }
+
+    let active = true;
+    ticketApi.getTicketById(currentProjectId, selectedTicket.id)
+      .then((fullTicket) => {
+        if (!active) return;
+        setSelectedTicket((prev) => (prev && prev.id === fullTicket.id ? fullTicket : prev));
+      })
+      .catch(() => {
+        // ignore detail hydration failures to keep panel usable with list payload
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentProjectId, selectedTicket?.id]);
+
   const updateTicketStatus = useCallback(async (id: string, status: TicketStatus) => {
-    await ticketApi.updateStatus(currentProjectId, id, status, Number(currentUser.id));
+    await ticketApi.updateStatus(currentProjectId, id, status);
     await refreshAll();
 
     setSelectedTicket((prev) => {
       if (!prev || prev.id !== id) return prev;
       return { ...prev, status };
     });
-  }, [currentProjectId, currentUser.id, refreshAll]);
+  }, [currentProjectId, refreshAll]);
 
   const createTicket = useCallback(async (data: {
     projectId: string;
@@ -143,13 +163,13 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
   }, [currentProjectId, refreshAll]);
 
-  const toggleStar = useCallback(async (id: string) => {
-    const ticket = tickets.find((t) => t.id === id);
-    if (!ticket) return;
-
-    await ticketApi.updateStar(currentProjectId, id, !ticket.starred, Number(currentUser.id));
+  const addTicketComment = useCallback(async (id: string, text: string) => {
+    if (!text.trim()) return;
+    await ticketApi.addComment(currentProjectId, id, text.trim());
     await refreshAll();
-  }, [currentProjectId, currentUser.id, refreshAll, tickets]);
+    const detailed = await ticketApi.getTicketById(currentProjectId, id);
+    setSelectedTicket((prev) => (prev && prev.id === id ? detailed : prev));
+  }, [currentProjectId, refreshAll]);
 
   return (
     <TicketContext.Provider
@@ -166,10 +186,12 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
         updateTicketStatus,
         createTicket,
         updateTicketAssignees,
-        toggleStar,
+        addTicketComment,
       }}
     >
       {children}
     </TicketContext.Provider>
   );
 };
+
+

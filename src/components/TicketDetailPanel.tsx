@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { X, MessageSquare, Activity, FileText } from 'lucide-react';
 import { statusLabels } from '@/data/models';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from './TicketBadges';
@@ -8,11 +8,13 @@ import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, users } = useTickets();
+  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment, users } = useTickets();
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
   const [editingAssignees, setEditingAssignees] = useState(false);
   const [assigneeIdsDraft, setAssigneeIdsDraft] = useState<string[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   const ticket = selectedTicket;
   React.useEffect(() => {
@@ -32,7 +34,6 @@ const TicketDetailPanel = () => {
     <>
       <div className="fixed inset-0 z-40 bg-foreground/20" onClick={() => setSelectedTicket(null)} />
       <div className="fixed right-0 top-0 h-screen w-full max-w-[600px] bg-card border-l shadow-2xl z-50 flex flex-col animate-slide-in-right">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b shrink-0">
           <div className="flex items-center gap-2">
             <TypeIcon type={ticket.type} />
@@ -41,12 +42,10 @@ const TicketDetailPanel = () => {
           <button onClick={() => setSelectedTicket(null)} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* Title */}
         <div className="px-4 pt-4 pb-2 shrink-0">
           <h2 className="text-lg font-semibold leading-tight">{ticket.title}</h2>
         </div>
 
-        {/* Status bar */}
         <div className="px-4 pb-3 flex items-center gap-2 shrink-0">
           <select
             value={ticket.status}
@@ -59,7 +58,6 @@ const TicketDetailPanel = () => {
           <DeptBadge department={ticket.department} />
         </div>
 
-        {/* Tabs */}
         <div className="flex border-b px-4 shrink-0">
           {tabs.map(tab => (
             <button
@@ -76,7 +74,6 @@ const TicketDetailPanel = () => {
           ))}
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === 'details' && (
             <div className="space-y-4">
@@ -152,7 +149,7 @@ const TicketDetailPanel = () => {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Due Date</label>
-                  <p className="text-sm mt-1">{ticket.dueDate ? format(new Date(ticket.dueDate), 'MMM d, yyyy') : '—'}</p>
+                  <p className="text-sm mt-1">{ticket.dueDate ? format(new Date(ticket.dueDate), 'MMM d, yyyy') : '-'}</p>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Type</label>
@@ -202,6 +199,34 @@ const TicketDetailPanel = () => {
 
           {activeTab === 'comments' && (
             <div className="space-y-3">
+              <div className="space-y-2 border rounded-md p-3">
+                <textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  className="w-full min-h-20 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Write a comment..."
+                />
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs disabled:opacity-60"
+                    disabled={submittingComment || !commentText.trim()}
+                    onClick={async () => {
+                      if (!commentText.trim()) return;
+                      setSubmittingComment(true);
+                      try {
+                        await addTicketComment(ticket.id, commentText);
+                        setCommentText('');
+                      } finally {
+                        setSubmittingComment(false);
+                      }
+                    }}
+                  >
+                    {submittingComment ? 'Posting...' : 'Post Comment'}
+                  </button>
+                </div>
+              </div>
+
               {ticket.comments.length === 0 && <p className="text-sm text-muted-foreground">No comments yet.</p>}
               {ticket.comments.map(comment => (
                 <div key={comment.id} className="flex gap-3">
@@ -228,7 +253,7 @@ const TicketDetailPanel = () => {
               onClick={() => setPreviewAttachment(null)}
               className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-card border text-foreground flex items-center justify-center"
             >
-              ×
+              x
             </button>
           </div>
         </div>

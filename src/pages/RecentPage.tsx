@@ -1,17 +1,39 @@
-import React from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
-import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge } from '@/components/TicketBadges';
+import { StatusBadge, TypeIcon } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
+import { Ticket } from '@/data/models';
+import { useLocation } from 'react-router-dom';
+import { resolveProjectId } from '@/services/projectControl';
+import { ticketApi } from '@/services/ticketApi';
 
 const RecentPage = () => {
-  const { tickets, setSelectedTicket } = useTickets();
-  const recent = [...tickets].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 10);
+  const { setSelectedTicket } = useTickets();
+  const location = useLocation();
+  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const [recent, setRecent] = useState<Ticket[]>([]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setRecent([]);
+      return;
+    }
+
+    ticketApi.queryTickets(projectId, {
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: 10,
+    })
+      .then((res) => setRecent(res.items))
+      .catch(() => setRecent([]));
+  }, [projectId]);
 
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto">
       <h1 className="text-xl font-semibold">Recent</h1>
       <div className="space-y-2">
-        {recent.map(ticket => (
+        {recent.map((ticket) => (
           <button
             key={ticket.id}
             onClick={() => setSelectedTicket(ticket)}

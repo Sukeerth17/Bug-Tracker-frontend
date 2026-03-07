@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
+﻿import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -13,7 +13,6 @@ import ListPage from "@/pages/ListPage";
 import BoardPage from "@/pages/BoardPage";
 import ForYouPage from "@/pages/ForYouPage";
 import RecentPage from "@/pages/RecentPage";
-import StarredPage from "@/pages/StarredPage";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import VerifyOTP from "@/pages/VerifyOTP";
@@ -97,12 +96,6 @@ function App() {
                 path="/recent"
                 element={<RecentPage />}
               />
-
-              <Route
-                path="/starred"
-                element={<StarredPage />}
-              />
-
               <Route
                 path="/admin/projects"
                 element={<SuperAdminRoute><AdminProjectsPage /></SuperAdminRoute>}
@@ -127,3 +120,4 @@ function App() {
 }
 
 export default App;
+

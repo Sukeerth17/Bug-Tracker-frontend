@@ -1,6 +1,6 @@
-import api from '@/services/api';
+﻿import api from '@/services/api';
 import { ActivityEvent, Ticket, User } from '@/data/models';
-import { API_ENDPOINTS } from '@/services/controlapi';
+import { API_ENDPOINTS } from '@/services/controlApi';
 
 interface ApiUser {
   id: number;
@@ -57,6 +57,31 @@ interface ApiPage<T> {
   totalPages: number;
 }
 
+export interface TicketQueryParams {
+  q?: string;
+  status?: Ticket['status'];
+  priority?: Ticket['priority'];
+  assigneeId?: number;
+  createdFrom?: string;
+  createdTo?: string;
+  updatedFrom?: string;
+  updatedTo?: string;
+  dueFrom?: string;
+  dueTo?: string;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  size?: number;
+}
+
+export interface TicketPage {
+  items: Ticket[];
+  page: number;
+  size: number;
+  totalItems: number;
+  totalPages: number;
+}
+
 function mapUser(user: ApiUser | null): User | null {
   if (!user) return null;
   return {
@@ -71,7 +96,7 @@ function mapUser(user: ApiUser | null): User | null {
 function mapActivity(event: ApiActivity): ActivityEvent {
   return {
     id: event.id,
-    user: (mapUser(event.user) as User),
+    user: mapUser(event.user) as User,
     action: event.action,
     field: event.field,
     oldValue: event.oldValue,
@@ -92,7 +117,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
   };
 
   const mappedAssignees = (ticket.assignees || []).map((assignee) => mapUser(assignee) as User);
-  const mappedPrimaryAssignee = mapUser(ticket.assignee) || (mappedAssignees[0] || null);
+  const mappedPrimaryAssignee = mapUser(ticket.assignee) || mappedAssignees[0] || null;
 
   return {
     id: ticket.id,
@@ -112,7 +137,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
     attachments: ticket.attachments || [],
     comments: (ticket.comments || []).map((comment) => ({
       id: comment.id,
-      user: (mapUser(comment.user) as User),
+      user: mapUser(comment.user) as User,
       text: comment.text,
       createdAt: comment.createdAt,
     })),
@@ -136,9 +161,24 @@ export const ticketApi = {
   },
 
   async getTickets(projectId: string): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[] | ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, { params: { projectId } });
-    const rows = Array.isArray(response.data) ? response.data : (response.data.items || []);
+    const response = await api.get<ApiTicket[] | ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, {
+      params: { projectId, page: 0, size: 500 },
+    });
+    const rows = Array.isArray(response.data) ? response.data : response.data.items || [];
     return rows.map(mapTicket);
+  },
+
+  async queryTickets(projectId: string, params: TicketQueryParams = {}): Promise<TicketPage> {
+    const response = await api.get<ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, {
+      params: { projectId, ...params },
+    });
+    return {
+      items: (response.data.items || []).map(mapTicket),
+      page: response.data.page,
+      size: response.data.size,
+      totalItems: response.data.totalItems,
+      totalPages: response.data.totalPages,
+    };
   },
 
   async getSummary(projectId: string): Promise<Ticket[]> {
@@ -149,6 +189,13 @@ export const ticketApi = {
   async getActivity(projectId: string): Promise<ActivityEvent[]> {
     const response = await api.get<ApiActivity[]>(API_ENDPOINTS.activity, { params: { projectId } });
     return response.data.map(mapActivity);
+  },
+
+  async getTicketById(projectId: string, ticketId: string): Promise<Ticket> {
+    const response = await api.get<ApiTicket>(API_ENDPOINTS.ticketById.replace('{ticketId}', ticketId), {
+      params: { projectId },
+    });
+    return mapTicket(response.data);
   },
 
   async createTicket(payload: {
@@ -168,19 +215,10 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
-  async updateStatus(projectId: string, ticketId: string, status: Ticket['status'], changedByUserId: number): Promise<Ticket> {
+  async updateStatus(projectId: string, ticketId: string, status: Ticket['status']): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketStatus.replace('{ticketId}', ticketId),
       { status },
-      { params: { projectId } },
-    );
-    return mapTicket(response.data);
-  },
-
-  async updateStar(projectId: string, ticketId: string, starred: boolean, changedByUserId: number): Promise<Ticket> {
-    const response = await api.patch<ApiTicket>(
-      API_ENDPOINTS.ticketStar.replace('{ticketId}', ticketId),
-      { starred },
       { params: { projectId } },
     );
     return mapTicket(response.data);
@@ -193,5 +231,14 @@ export const ticketApi = {
       { params: { projectId } },
     );
     return mapTicket(response.data);
+  },
+
+  async addComment(projectId: string, ticketId: string, text: string) {
+    const response = await api.post(
+      API_ENDPOINTS.ticketComments.replace('{ticketId}', ticketId),
+      { text },
+      { params: { projectId } },
+    );
+    return response.data;
   },
 };

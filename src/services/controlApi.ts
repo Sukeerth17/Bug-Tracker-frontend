@@ -1,4 +1,4 @@
-export const API_CONTROL_KEYS = {
+﻿export const API_CONTROL_KEYS = {
   baseUrl: 'ticket.api.baseUrl',
   requesterUserId: 'ticket.api.requesterUserId',
 };
@@ -10,7 +10,6 @@ export const API_ENDPOINTS = {
   ticketById: '/tickets/{ticketId}',
   ticketStatus: '/tickets/{ticketId}/status',
   ticketAssignees: '/tickets/{ticketId}/assignees',
-  ticketStar: '/tickets/{ticketId}/star',
   ticketComments: '/tickets/{ticketId}/comments',
   activity: '/tickets/activity',
   summary: '/tickets/summary',
@@ -39,3 +38,4 @@ export function getRequesterUserId(): string {
 export function setRequesterUserId(userId: string) {
   localStorage.setItem(API_CONTROL_KEYS.requesterUserId, userId.trim() || '1');
 }
+
