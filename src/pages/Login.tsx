@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '@/components/AuthLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { projectApi } from '@/services/projectApi';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
@@ -21,7 +22,9 @@ const Login = () => {
     setLoading(true);
     try {
       await login(email, password);
-      navigate('/space/sp1/board');
+      const projects = await projectApi.getProjects();
+      const firstProjectId = projects[0]?.id;
+      navigate(firstProjectId ? `/space/${firstProjectId}/board` : '/for-you');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Login failed');
     } finally {

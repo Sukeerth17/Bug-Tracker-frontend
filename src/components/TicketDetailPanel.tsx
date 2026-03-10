@@ -6,6 +6,7 @@ import { useTickets } from '@/contexts/TicketContext';
 import type { TicketStatus } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 const TicketDetailPanel = () => {
   const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment, users } = useTickets();
@@ -16,6 +17,7 @@ const TicketDetailPanel = () => {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
 
   const ticket = selectedTicket;
 
@@ -52,9 +54,7 @@ const TicketDetailPanel = () => {
       setSelectedTicket(null);
       return;
     }
-    if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
-      setSelectedTicket(null);
-    }
+    setCloseConfirmOpen(true);
   };
 
   const handleSave = async () => {
@@ -312,6 +312,19 @@ const TicketDetailPanel = () => {
           </div>
         </div>
       )}
+      <ConfirmationModal
+        isOpen={closeConfirmOpen}
+        title="Unsaved Changes"
+        message="You have unsaved changes. Are you sure you want to leave without saving?"
+        confirmLabel="Leave"
+        cancelLabel="Cancel"
+        variant="warning"
+        onConfirm={() => {
+          setCloseConfirmOpen(false);
+          setSelectedTicket(null);
+        }}
+        onCancel={() => setCloseConfirmOpen(false)}
+      />
     </>
   );
 };

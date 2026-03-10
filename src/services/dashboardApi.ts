@@ -12,11 +12,13 @@ export interface DashboardSummary {
 }
 
 export const dashboardApi = {
-  async getSummary(projectId?: string): Promise<DashboardSummary> {
+  async getSummary(projectId?: string, department?: string): Promise<DashboardSummary> {
+    const params: Record<string, string> = {};
+    if (projectId) params.projectId = projectId;
+    if (department) params.department = department;
     const response = await api.get<DashboardSummary>(API_ENDPOINTS.dashboardSummary, {
-      params: projectId ? { projectId } : undefined,
+      params: Object.keys(params).length ? params : undefined,
     });
     return response.data;
   },
 };
-

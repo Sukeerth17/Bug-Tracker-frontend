@@ -30,6 +30,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
@@ -40,10 +41,20 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   }, []);
 
   useEffect(() => {
+    const openSearch = () => {
+      setSearchOpen(true);
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      });
+    };
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      const key = e.key?.toLowerCase();
+      const isShortcut = (e.metaKey || e.ctrlKey) && (key === 'k' || e.code === 'KeyK' || e.keyCode === 75);
+      if (isShortcut) {
         e.preventDefault();
-        setSearchOpen(true);
+        e.stopPropagation();
+        openSearch();
       }
       if (e.key === 'Escape') {
         setSearchOpen(false);
@@ -51,8 +62,12 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         setUserMenuOpen(false);
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, { capture: true });
+    document.addEventListener('keydown', handler, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handler, true);
+      document.removeEventListener('keydown', handler, true);
+    };
   }, []);
 
   useEffect(() => {
@@ -142,6 +157,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
             onFocus={() => setSearchOpen(true)}
+            ref={searchInputRef}
             className="w-full h-9 pl-9 pr-16 rounded-lg bg-muted/60 border-0 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
           <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">

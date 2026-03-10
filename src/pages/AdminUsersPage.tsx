@@ -1,6 +1,8 @@
 import React from 'react';
 import { ticketApi } from '@/services/ticketApi';
 import { User } from '@/data/models';
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { toast } from '@/components/ui/sonner';
 
 const AdminUsersPage = () => {
   const [users, setUsers] = React.useState<User[]>([]);
@@ -12,6 +14,8 @@ const AdminUsersPage = () => {
   const [password, setPassword] = React.useState('');
   const [avatar, setAvatar] = React.useState('');
   const [error, setError] = React.useState('');
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -31,14 +35,17 @@ const AdminUsersPage = () => {
     setSaving(true);
     setError('');
     try {
-      const created = await ticketApi.createUser({
+      const result = await ticketApi.createUser({
         name: name.trim(),
         username: username.trim(),
         email: email.trim(),
         password,
         avatar: avatar.trim() || 'US',
       });
-      setUsers((prev) => [created, ...prev]);
+      setUsers((prev) => [result.user, ...prev]);
+      if (!result.emailSent && result.warning) {
+        toast(result.warning, { description: 'User was created but email delivery failed.' });
+      }
       setName('');
       setUsername('');
       setEmail('');
@@ -51,17 +58,24 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    if (!window.confirm('Delete this user? Tickets will be reassigned/archived by backend policy.')) return;
+  const requestDelete = (userId: string) => {
+    setPendingDeleteId(userId);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
     setSaving(true);
     setError('');
     try {
-      await ticketApi.deleteUser(userId);
-      await load();
+      await ticketApi.deleteUser(pendingDeleteId);
+      setUsers((prev) => prev.filter((user) => user.id !== pendingDeleteId));
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to delete user');
     } finally {
       setSaving(false);
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -95,7 +109,7 @@ const AdminUsersPage = () => {
                 </div>
                 {user.role !== 'SUPER_ADMIN' && (
                   <button
-                    onClick={() => handleDelete(user.id)}
+                    onClick={() => requestDelete(user.id)}
                     disabled={saving}
                     className="h-8 px-3 rounded-md border text-xs text-destructive hover:bg-destructive/10"
                   >
@@ -107,6 +121,20 @@ const AdminUsersPage = () => {
           </div>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmOpen}
+        title="Delete User"
+        message="Delete this user? Tickets will be reassigned/archived by backend policy."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+      />
     </div>
   );
 };

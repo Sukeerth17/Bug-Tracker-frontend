@@ -19,14 +19,14 @@ const ForgotPassword = () => {
       const msg = await authService.forgotPassword(email);
       setMessage(msg);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to send OTP');
+      setError(err?.response?.data?.message || 'Unable to send credentials');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="Forgot Password" subtitle="We will send a reset link to your email" footerText="Remembered it?" footerLinkText="Login" footerLinkTo="/login">
+    <AuthLayout title="Forgot Password" subtitle="We will send temporary credentials to your email" footerText="Remembered it?" footerLinkText="Login" footerLinkTo="/login">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Email</label>
@@ -34,7 +34,7 @@ const ForgotPassword = () => {
         </div>
         {message && <p className="text-xs text-emerald-600">{message}</p>}
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <Button type="submit" disabled={loading} className="w-full">{loading ? 'Sending...' : 'Send Reset Link'}</Button>
+        <Button type="submit" disabled={loading} className="w-full">{loading ? 'Sending...' : 'Send Credentials'}</Button>
       </form>
     </AuthLayout>
   );

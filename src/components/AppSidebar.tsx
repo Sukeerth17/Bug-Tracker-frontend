@@ -69,13 +69,13 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       )}
     >
       <div
-        className={cn('flex items-center h-14 px-4 border-b border-sidebar-border cursor-pointer', collapsed && 'justify-center px-2')}
+        className={cn('flex items-center h-16 px-4 border-b border-sidebar-border cursor-pointer', collapsed && 'justify-center px-2')}
         onClick={() => navigate(currentProjectId ? `/space/${currentProjectId}/board` : '/for-you')}
       >
         {collapsed ? (
-          <span className="text-lg font-bold text-sidebar-primary">T</span>
+          <span className="text-2xl font-bold text-sidebar-primary">T</span>
         ) : (
-          <span className="text-lg font-bold tracking-tight">
+          <span className="text-2xl font-bold tracking-tight">
             <span className="text-sidebar-primary">Ticket</span>
             <span className="text-sidebar-foreground">Desk</span>
           </span>
@@ -89,7 +89,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
               key={item.to}
               to={item.to}
               className={({ isActive }) => cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-150',
+                'flex items-center gap-3 rounded-md px-3 py-2 text-base transition-colors duration-150',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary'
                   : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
@@ -104,7 +104,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
 
         <div className="mt-6 px-2">
           {!collapsed && (
-            <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted">
+            <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-widest text-sidebar-muted">
               Projects
             </p>
           )}
@@ -130,7 +130,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                       </button>
                       <button
                         onClick={() => navigate(`/space/${project.id}/board`)}
-                        className="flex-1 flex items-center gap-2 px-1 py-0.5 rounded text-xs text-left"
+                        className="flex-1 flex items-center gap-2 px-1 py-0.5 rounded text-sm text-left"
                       >
                         <span className="h-2 w-2 rounded-sm shrink-0 bg-sidebar-primary" />
                         <span className="truncate">{project.name}</span>
@@ -141,7 +141,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                         <NavLink
                           to={`/space/${project.id}/summary`}
                           className={({ isActive }) => cn(
-                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors',
+                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                             isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                           )}
                         >
@@ -151,7 +151,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                         <NavLink
                           to={`/space/${project.id}/board`}
                           className={({ isActive }) => cn(
-                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors',
+                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                             isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                           )}
                         >
@@ -161,7 +161,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                         <NavLink
                           to={`/space/${project.id}/list`}
                           className={({ isActive }) => cn(
-                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] transition-colors',
+                            'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
                             isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
                           )}
                         >
@@ -177,14 +177,14 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                   <>
                     <button
                       onClick={() => navigate('/admin/projects')}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     >
                       <FolderPlus className="h-3.5 w-3.5" />
                       <span>Create Project</span>
                     </button>
                     <button
                       onClick={() => navigate('/admin/users')}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     >
                       <Users className="h-3.5 w-3.5" />
                       <span>User Management</span>

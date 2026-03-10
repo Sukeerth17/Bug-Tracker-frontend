@@ -39,10 +39,14 @@ const SummaryPage = () => {
       setDashboard(null);
       return;
     }
-    dashboardApi.getSummary(projectId)
+    const deptParam = deptFilter === 'All'
+      ? undefined
+      : deptFilter.toUpperCase().replace(/\s+/g, '_');
+    dashboardApi.getSummary(projectId, deptParam)
       .then(setDashboard)
       .catch(() => setDashboard(null));
-  }, [projectId]);
+  }, [projectId, deptFilter]);
+
 
   useEffect(() => {
     if (!projectId) {
@@ -59,20 +63,15 @@ const SummaryPage = () => {
       .catch(() => setSummaryRows([]));
   }, [projectId, listDeptFilter, listStatusFilter, sortKey, sortDir]);
 
-  const filtered = useMemo(() => {
-    if (deptFilter === 'All') return summaryRows;
-    return summaryRows.filter((tk) => tk.department === deptFilter);
-  }, [summaryRows, deptFilter]);
-
   const statusCounts = useMemo(() => {
     const byStatus = dashboard?.byStatus || {};
-    const todo = Number(byStatus['todo'] || filtered.filter((t) => t.status === 'todo').length);
-    const inProgress = Number(byStatus['in-progress'] || filtered.filter((t) => t.status === 'in-progress').length);
-    const inReview = Number(byStatus['in-review'] || filtered.filter((t) => t.status === 'in-review').length);
-    const done = Number(byStatus['done'] || filtered.filter((t) => t.status === 'done').length);
-    const total = Number(dashboard?.totalTickets ?? filtered.length);
+    const todo = Number(byStatus['todo'] || 0);
+    const inProgress = Number(byStatus['in-progress'] || 0);
+    const inReview = Number(byStatus['in-review'] || 0);
+    const done = Number(byStatus['done'] || 0);
+    const total = Number(dashboard?.totalTickets ?? 0);
     return { todo, inProgress, inReview, done, total };
-  }, [dashboard, filtered]);
+  }, [dashboard]);
 
   const stats = useMemo(() => {
     return [
@@ -128,7 +127,7 @@ const SummaryPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:hidden">
         {stats.map((s) => (
           <div key={s.label} className="bg-card rounded-xl border p-4 flex items-center gap-3">
             <div className={cn('p-2 rounded-lg bg-muted', s.color)}>
@@ -139,6 +138,22 @@ const SummaryPage = () => {
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </div>
           </div>
+        ))}
+      </div>
+      <div className="hidden md:flex items-stretch bg-card rounded-xl border">
+        {stats.map((s, idx) => (
+          <React.Fragment key={s.label}>
+            <div className="flex-1 p-4 flex items-center gap-3">
+              <div className={cn('p-2 rounded-lg bg-muted', s.color)}>
+                <s.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </div>
+            {idx < stats.length - 1 && <div className="status-divider" />}
+          </React.Fragment>
         ))}
       </div>
 

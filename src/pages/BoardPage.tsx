@@ -3,8 +3,11 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { useTickets } from '@/contexts/TicketContext';
 import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
 import type { TicketStatus } from '@/data/models';
+import { statusLabels } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle2, Paperclip } from 'lucide-react';
+import ConfirmationModal from '@/components/ConfirmationModal';
+import { toast } from '@/components/ui/sonner';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
@@ -14,7 +17,13 @@ const columns: { id: TicketStatus; label: string; color: string }[] = [
 ];
 
 const BoardPage = () => {
-  const { tickets, setSelectedTicket } = useTickets();
+  const { tickets, setSelectedTicket, updateTicketStatus } = useTickets();
+  const [pendingMove, setPendingMove] = React.useState<{
+    ticketId: string;
+    title: string;
+    fromStatus: TicketStatus;
+    toStatus: TicketStatus;
+  } | null>(null);
 
   const grouped = columns.map(col => ({
     ...col,
@@ -23,8 +32,17 @@ const BoardPage = () => {
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-    // Status changes require explicit Save in the detail panel.
-    return;
+    const fromStatus = result.source.droppableId as TicketStatus;
+    const toStatus = result.destination.droppableId as TicketStatus;
+    if (fromStatus === toStatus) return;
+    const ticket = tickets.find(t => t.id === result.draggableId);
+    if (!ticket) return;
+    setPendingMove({
+      ticketId: ticket.id,
+      title: ticket.title,
+      fromStatus,
+      toStatus,
+    });
   };
 
   return (
@@ -111,6 +129,24 @@ const BoardPage = () => {
           ))}
         </div>
       </DragDropContext>
+      <ConfirmationModal
+        isOpen={!!pendingMove}
+        title="Move Ticket"
+        message={pendingMove
+          ? `Are you sure you want to move '${pendingMove.title}' from '${statusLabels[pendingMove.fromStatus]}' to '${statusLabels[pendingMove.toStatus]}'?`
+          : ''}
+        confirmLabel="Yes, Move It"
+        cancelLabel="Cancel"
+        variant="info"
+        onConfirm={async () => {
+          if (!pendingMove) return;
+          const { ticketId, toStatus } = pendingMove;
+          setPendingMove(null);
+          await updateTicketStatus(ticketId, toStatus);
+          toast(`Ticket moved to ${statusLabels[toStatus]}`);
+        }}
+        onCancel={() => setPendingMove(null)}
+      />
     </div>
   );
 };

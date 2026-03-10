@@ -147,10 +147,16 @@ function mapTicket(ticket: ApiTicket): Ticket {
   };
 }
 
+type CreateUserResponse = { user: ApiUser; emailSent: boolean; warning?: string | null };
+
 export const ticketApi = {
-  async createUser(payload: { name: string; username: string; email: string; password: string; avatar: string }): Promise<User> {
-    const response = await api.post<ApiUser>(API_ENDPOINTS.users, payload);
-    return mapUser(response.data) as User;
+  async createUser(payload: { name: string; username: string; email: string; password: string; avatar: string }): Promise<{ user: User; emailSent: boolean; warning?: string }> {
+    const response = await api.post<CreateUserResponse>(API_ENDPOINTS.users, payload);
+    return {
+      user: mapUser(response.data.user) as User,
+      emailSent: response.data.emailSent,
+      warning: response.data.warning ?? undefined,
+    };
   },
 
   async deleteUser(userId: string): Promise<void> {

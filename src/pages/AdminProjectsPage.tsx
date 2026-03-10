@@ -1,5 +1,6 @@
 import React from 'react';
 import { projectApi, ProjectItem } from '@/services/projectApi';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 const AdminProjectsPage = () => {
   const [projects, setProjects] = React.useState<ProjectItem[]>([]);
@@ -10,6 +11,8 @@ const AdminProjectsPage = () => {
   const [startDate, setStartDate] = React.useState('');
   const [metadataJson, setMetadataJson] = React.useState('');
   const [error, setError] = React.useState('');
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -48,17 +51,24 @@ const AdminProjectsPage = () => {
     }
   };
 
-  const handleDelete = async (projectId: string) => {
-    if (!window.confirm('Delete this project permanently? All related tickets will be deleted.')) return;
+  const requestDelete = (projectId: string) => {
+    setPendingDeleteId(projectId);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
     setSaving(true);
     setError('');
     try {
-      await projectApi.deleteProject(projectId);
+      await projectApi.deleteProject(pendingDeleteId);
       await load();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to delete project');
     } finally {
       setSaving(false);
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
     }
   };
 
@@ -89,7 +99,7 @@ const AdminProjectsPage = () => {
                   <p className="text-xs text-muted-foreground">{project.id}</p>
                 </div>
                 <button
-                  onClick={() => handleDelete(project.id)}
+                  onClick={() => requestDelete(project.id)}
                   disabled={saving}
                   className="h-8 px-3 rounded-md border text-xs text-destructive hover:bg-destructive/10"
                 >
@@ -101,6 +111,20 @@ const AdminProjectsPage = () => {
           </div>
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmOpen}
+        title="Delete Project"
+        message="Delete this project permanently? All related tickets will be deleted."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setConfirmOpen(false);
+          setPendingDeleteId(null);
+        }}
+      />
     </div>
   );
 };

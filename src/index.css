@@ -120,4 +120,14 @@
     background-color: hsl(38 92% 50% / 0.15);
     color: hsl(38 92% 40%);
   }
+  .status-divider {
+    border-left: 2px dotted hsl(214 20% 90%);
+    align-self: stretch;
+  }
+}
+
+@media (max-width: 768px) {
+  .status-divider {
+    display: none;
+  }
 }

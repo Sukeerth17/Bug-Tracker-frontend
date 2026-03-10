@@ -50,10 +50,6 @@ export const authService = {
     return response.data.message;
   },
 
-  async resetPassword(email: string, token: string, newPassword: string) {
-    const response = await api.post<{ message: string }>('/auth/reset-password', { email, token, newPassword });
-    return response.data.message;
-  },
 
   logout() {
     clearAuthStorage();
