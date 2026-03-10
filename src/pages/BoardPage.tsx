@@ -1,21 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTickets } from '@/contexts/TicketContext';
 import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
-import { statusLabels } from '@/data/models';
-import type { TicketStatus, Ticket } from '@/data/models';
+import type { TicketStatus } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle2, Paperclip } from 'lucide-react';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
-  { id: 'in-progress', label: 'IN PROGRESS', color: '#f59e0b' },
-  { id: 'in-review', label: 'IN REVIEW', color: '#6366f1' },
+  { id: 'in-progress', label: 'IN PROGRESS', color: '#3b82f6' },
+  { id: 'in-review', label: 'IN REVIEW', color: '#f59e0b' },
   { id: 'done', label: 'DONE', color: '#22c55e' },
 ];
 
 const BoardPage = () => {
-  const { tickets, updateTicketStatus, setSelectedTicket } = useTickets();
+  const { tickets, setSelectedTicket } = useTickets();
 
   const grouped = columns.map(col => ({
     ...col,
@@ -24,9 +23,8 @@ const BoardPage = () => {
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-    const ticketId = result.draggableId;
-    const newStatus = result.destination.droppableId as TicketStatus;
-    updateTicketStatus(ticketId, newStatus);
+    // Status changes require explicit Save in the detail panel.
+    return;
   };
 
   return (
@@ -41,11 +39,10 @@ const BoardPage = () => {
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                   className={cn(
-                    'flex-shrink-0 w-72 rounded-xl bg-muted/40 border flex flex-col transition-colors',
+                    'flex-shrink-0 w-72 rounded-xl bg-muted/40 border-2 border-muted-foreground/20 flex flex-col transition-colors',
                     snapshot.isDraggingOver && 'bg-primary/5 border-primary/30'
                   )}
                 >
-                  {/* Column header */}
                   <div className="flex items-center gap-2 px-3 py-3 border-b">
                     <span className="h-2 w-2 rounded-full" style={{ backgroundColor: col.color }} />
                     <span className="text-xs font-bold tracking-wide">{col.label}</span>
@@ -53,7 +50,6 @@ const BoardPage = () => {
                     {col.id === 'done' && <CheckCircle2 className="h-3.5 w-3.5 text-success" />}
                   </div>
 
-                  {/* Cards */}
                   <div className="p-2 space-y-2 flex-1 min-h-[200px]">
                     {col.tickets.map((ticket, index) => (
                       <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
@@ -102,7 +98,6 @@ const BoardPage = () => {
                     {provided.placeholder}
                   </div>
 
-                  {/* Add button */}
                   <button
                     onClick={() => window.dispatchEvent(new CustomEvent('ticket:new', { detail: { status: col.id } }))}
                     className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors border-t"

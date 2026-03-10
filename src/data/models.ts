@@ -6,6 +6,7 @@ export type Department = 'Website' | 'Mobile' | 'Backend' | 'DevOps';
 export interface User {
   id: string;
   name: string;
+  username?: string;
   email: string;
   avatar: string;
   role?: 'USER' | 'SUPER_ADMIN';

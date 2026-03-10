@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, TypeIcon } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
@@ -19,13 +19,8 @@ const RecentPage = () => {
       return;
     }
 
-    ticketApi.queryTickets(projectId, {
-      sortBy: 'updatedAt',
-      sortDir: 'desc',
-      page: 0,
-      size: 10,
-    })
-      .then((res) => setRecent(res.items))
+    ticketApi.getRecent(projectId)
+      .then((res) => setRecent(res))
       .catch(() => setRecent([]));
   }, [projectId]);
 

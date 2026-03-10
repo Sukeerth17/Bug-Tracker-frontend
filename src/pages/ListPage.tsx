@@ -1,6 +1,6 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
-import { PriorityIcon, TypeIcon, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
+import { PriorityIcon, TypeIcon, UserAvatar, GhostAvatar, StatusBadge } from '@/components/TicketBadges';
 import { priorityLabels, statusLabels, Ticket } from '@/data/models';
 import type { TicketPriority, TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
@@ -15,12 +15,13 @@ import { ticketApi } from '@/services/ticketApi';
 type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'dueDate';
 
 const ListPage = () => {
-  const { setSelectedTicket, updateTicketStatus } = useTickets();
+  const { setSelectedTicket } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
 
   const [rows, setRows] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
@@ -68,6 +69,14 @@ const ListPage = () => {
     loadTickets();
   }, [loadTickets]);
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
   const toggleSort = (key: SortKey) => {
     setPage(0);
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -75,6 +84,11 @@ const ListPage = () => {
       setSortKey(key);
       setSortAsc(true);
     }
+  };
+
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return '↕';
+    return sortAsc ? '↑' : '↓';
   };
 
   const exportPDF = () => {
@@ -108,11 +122,6 @@ const ListPage = () => {
     doc.save(`tickets-export-${format(new Date(), 'yyyy-MM-dd')}.pdf`);
   };
 
-  const updateStatus = async (ticketId: string, status: TicketStatus) => {
-    await updateTicketStatus(ticketId, status);
-    await loadTickets();
-  };
-
   const thCls = 'px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer hover:text-foreground select-none';
   const isOverdue = (d: string | null) => d && new Date(d) < new Date();
   const isDueSoon = (d: string | null) => d && !isOverdue(d) && new Date(d) < new Date(Date.now() + 48 * 3600000);
@@ -132,15 +141,13 @@ const ListPage = () => {
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <input
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Filter tickets..."
               className="h-8 w-56 pl-8 pr-3 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
           </div>
+          {loading && <span className="text-xs text-muted-foreground">Loading...</span>}
           <select
             value={statusFilter}
             onChange={(e) => {
@@ -183,14 +190,14 @@ const ListPage = () => {
                     onChange={(e) => setSelected(e.target.checked ? new Set(rows.map((t) => t.id)) : new Set())}
                   />
                 </th>
-                <th className={thCls} onClick={() => toggleSort('title')}>Work {sortKey === 'title' && (sortAsc ? '?' : '?')}</th>
+                <th className={thCls} onClick={() => toggleSort('title')}>Work {sortIcon('title')}</th>
                 <th className={thCls}>Assignee</th>
                 <th className={thCls}>Reporter</th>
-                <th className={thCls} onClick={() => toggleSort('status')}>Status {sortKey === 'status' && (sortAsc ? '?' : '?')}</th>
-                <th className={thCls} onClick={() => toggleSort('priority')}>Priority {sortKey === 'priority' && (sortAsc ? '?' : '?')}</th>
-                <th className={thCls} onClick={() => toggleSort('createdAt')}>Created {sortKey === 'createdAt' && (sortAsc ? '?' : '?')}</th>
-                <th className={thCls} onClick={() => toggleSort('updatedAt')}>Updated {sortKey === 'updatedAt' && (sortAsc ? '?' : '?')}</th>
-                <th className={thCls} onClick={() => toggleSort('dueDate')}>Due {sortKey === 'dueDate' && (sortAsc ? '?' : '?')}</th>
+                <th className={thCls} onClick={() => toggleSort('status')}>Status {sortIcon('status')}</th>
+                <th className={thCls} onClick={() => toggleSort('priority')}>Priority {sortIcon('priority')}</th>
+                <th className={thCls} onClick={() => toggleSort('createdAt')}>Created {sortIcon('createdAt')}</th>
+                <th className={thCls} onClick={() => toggleSort('updatedAt')}>Updated {sortIcon('updatedAt')}</th>
+                <th className={thCls} onClick={() => toggleSort('dueDate')}>Due {sortIcon('dueDate')}</th>
               </tr>
             </thead>
             <tbody>
@@ -242,15 +249,7 @@ const ListPage = () => {
                       <span className="text-xs hidden xl:inline">{ticket.reporter.name}</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2">
-                    <select
-                      value={ticket.status}
-                      onChange={(e) => updateStatus(ticket.id, e.target.value as TicketStatus)}
-                      className="h-6 rounded-full text-[11px] font-medium border-0 bg-muted px-2 focus:outline-none cursor-pointer"
-                    >
-                      {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                    </select>
-                  </td>
+                  <td className="px-3 py-2"><StatusBadge status={ticket.status} /></td>
                   <td className="px-3 py-2"><PriorityIcon priority={ticket.priority} /></td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{format(new Date(ticket.createdAt), 'MMM d, yyyy')}</td>
                   <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{format(new Date(ticket.updatedAt), 'MMM d, yyyy')}</td>
@@ -261,29 +260,53 @@ const ListPage = () => {
               ))}
               {rows.length === 0 && !loading && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted-foreground">No tickets found.</td>
+                  <td colSpan={9} className="px-3 py-6 text-center text-sm text-muted-foreground">No tickets found.</td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3 border-t text-xs text-muted-foreground">
+        <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2">
-            <button disabled={page === 0 || loading} onClick={() => setPage((p) => p - 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-            <span>{page + 1} / {totalPages || 1}</span>
-            <button disabled={page >= totalPages - 1 || loading} onClick={() => setPage((p) => p + 1)} className="p-1 rounded hover:bg-accent disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+            <button
+              className="h-8 w-8 rounded-md border flex items-center justify-center text-muted-foreground hover:text-foreground"
+              onClick={() => setPage((p) => Math.max(p - 1, 0))}
+              disabled={page === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              className="h-8 w-8 rounded-md border flex items-center justify-center text-muted-foreground hover:text-foreground"
+              onClick={() => setPage((p) => Math.min(p + 1, totalPages - 1))}
+              disabled={page >= totalPages - 1}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <span className="text-xs text-muted-foreground">Page {page + 1} of {totalPages}</span>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={exportPDF} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-md border text-xs font-medium hover:bg-accent transition-colors" disabled={rows.length === 0}>
+            <button
+              onClick={exportPDF}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md border text-xs font-medium hover:bg-accent"
+            >
               <Download className="h-3.5 w-3.5" />
               Export PDF
             </button>
-            <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }} className="h-7 rounded border bg-background px-2 text-xs" disabled={loading}>
-              {[10, 25, 50].map((n) => <option key={n} value={n}>{n} / page</option>)}
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(0);
+              }}
+              className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value={10}>10 / page</option>
+              <option value={25}>25 / page</option>
+              <option value={50}>50 / page</option>
             </select>
-            <span>
-              Showing {totalItems === 0 ? 0 : (page * pageSize + 1)}-{Math.min((page + 1) * pageSize, totalItems)} of {totalItems}
+            <span className="text-xs text-muted-foreground">
+              Showing {rows.length === 0 ? 0 : page * pageSize + 1}–{Math.min((page + 1) * pageSize, totalItems)} of {totalItems}
             </span>
           </div>
         </div>
@@ -293,5 +316,3 @@ const ListPage = () => {
 };
 
 export default ListPage;
-
-

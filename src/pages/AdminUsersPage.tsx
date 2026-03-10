@@ -7,7 +7,9 @@ const AdminUsersPage = () => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [name, setName] = React.useState('');
+  const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
   const [avatar, setAvatar] = React.useState('');
   const [error, setError] = React.useState('');
 
@@ -29,11 +31,19 @@ const AdminUsersPage = () => {
     setSaving(true);
     setError('');
     try {
-      await ticketApi.createUser({ name: name.trim(), email: email.trim(), avatar: avatar.trim() || 'US' });
+      const created = await ticketApi.createUser({
+        name: name.trim(),
+        username: username.trim(),
+        email: email.trim(),
+        password,
+        avatar: avatar.trim() || 'US',
+      });
+      setUsers((prev) => [created, ...prev]);
       setName('');
+      setUsername('');
       setEmail('');
+      setPassword('');
       setAvatar('');
-      await load();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to add user');
     } finally {
@@ -62,11 +72,13 @@ const AdminUsersPage = () => {
       <form onSubmit={handleAdd} className="bg-card rounded-xl border p-4 space-y-3">
         <div className="grid md:grid-cols-3 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Full name" required />
+          <input value={username} onChange={(e) => setUsername(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Username" required />
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="email" placeholder="Gmail address" required />
-          <input value={avatar} onChange={(e) => setAvatar(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Avatar initials" />
+          <input value={password} onChange={(e) => setPassword(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="password" placeholder="Password (min 8 chars)" required minLength={8} />
+          <input value={avatar} onChange={(e) => setAvatar(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2" placeholder="Avatar initials" />
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-        <button disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{saving ? 'Saving...' : 'Add User (Google Onboard)'}</button>
+        <button disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{saving ? 'Saving...' : 'Add User'}</button>
       </form>
 
       <div className="bg-card rounded-xl border p-4">

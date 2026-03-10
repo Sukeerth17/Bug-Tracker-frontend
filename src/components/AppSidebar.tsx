@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  User, Clock, Settings, HelpCircle,
+  User, Clock,
   LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -219,17 +219,6 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
           </div>
         </div>
       </nav>
-
-      <div className="border-t border-sidebar-border py-2 px-2 space-y-0.5">
-        <button className={cn('flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors', collapsed && 'justify-center px-2')}>
-          <Settings className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </button>
-        <button className={cn('flex items-center gap-3 w-full rounded-md px-3 py-2 text-sm text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors', collapsed && 'justify-center px-2')}>
-          <HelpCircle className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Help</span>}
-        </button>
-      </div>
     </aside>
   );
 };

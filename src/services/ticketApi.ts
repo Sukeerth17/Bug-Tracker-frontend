@@ -5,6 +5,7 @@ import { API_ENDPOINTS } from '@/services/controlApi';
 interface ApiUser {
   id: number;
   name: string;
+  username?: string;
   email: string;
   avatar: string;
   role?: 'USER' | 'SUPER_ADMIN';
@@ -87,6 +88,7 @@ function mapUser(user: ApiUser | null): User | null {
   return {
     id: String(user.id),
     name: user.name,
+    username: user.username,
     email: user.email,
     avatar: user.avatar,
     role: user.role || 'USER',
@@ -146,8 +148,8 @@ function mapTicket(ticket: ApiTicket): Ticket {
 }
 
 export const ticketApi = {
-  async createUser(payload: { name: string; email: string; avatar: string }): Promise<User> {
-    const response = await api.post<ApiUser>(`${API_ENDPOINTS.users}/google-onboard`, payload);
+  async createUser(payload: { name: string; username: string; email: string; password: string; avatar: string }): Promise<User> {
+    const response = await api.post<ApiUser>(API_ENDPOINTS.users, payload);
     return mapUser(response.data) as User;
   },
 
@@ -155,8 +157,11 @@ export const ticketApi = {
     await api.delete(API_ENDPOINTS.userById.replace('{userId}', userId));
   },
 
-  async getUsers(projectId?: string): Promise<User[]> {
-    const response = await api.get<ApiUser[]>(API_ENDPOINTS.users, { params: projectId ? { projectId } : undefined });
+  async getUsers(projectId?: string, assignable?: boolean): Promise<User[]> {
+    const params: Record<string, any> = {};
+    if (projectId) params.projectId = projectId;
+    if (assignable) params.assignable = true;
+    const response = await api.get<ApiUser[]>(API_ENDPOINTS.users, { params: Object.keys(params).length ? params : undefined });
     return response.data.map((user) => mapUser(user) as User);
   },
 
@@ -183,6 +188,21 @@ export const ticketApi = {
 
   async getSummary(projectId: string): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary, { params: { projectId } });
+    return response.data.map(mapTicket);
+  },
+
+  async getSummaryFiltered(projectId: string, params: { department?: string; status?: string; sortBy?: string; sortDir?: string }): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary, { params: { projectId, ...params } });
+    return response.data.map(mapTicket);
+  },
+
+  async getRecent(projectId: string): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/recent`, { params: { projectId } });
+    return response.data.map(mapTicket);
+  },
+
+  async getForYou(projectId: string): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/for-you`, { params: { projectId } });
     return response.data.map(mapTicket);
   },
 

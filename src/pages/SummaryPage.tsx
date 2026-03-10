@@ -1,25 +1,28 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Activity as ActivityIcon, ListChecks, CalendarClock } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, ListChecks } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, UserAvatar, DeptBadge } from '@/components/TicketBadges';
 import { statusLabels, departments } from '@/data/models';
-import type { Department, TicketStatus } from '@/data/models';
+import type { Department, TicketStatus, Ticket } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dashboardApi, DashboardSummary } from '@/services/dashboardApi';
 import { useLocation } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
+import { ticketApi } from '@/services/ticketApi';
 
 const statusColors: Record<TicketStatus, string> = {
   todo: '#94a3b8',
-  'in-progress': '#f59e0b',
-  'in-review': '#6366f1',
+  'in-progress': '#3b82f6',
+  'in-review': '#f59e0b',
   done: '#22c55e',
 };
 
+type SortKey = 'department' | 'status' | 'assignee';
+
 const SummaryPage = () => {
-  const { tickets, summaryTickets, allActivity, setSelectedTicket } = useTickets();
+  const { tickets, allActivity, setSelectedTicket } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
 
@@ -27,6 +30,9 @@ const SummaryPage = () => {
   const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
   const [listStatusFilter, setListStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
+  const [summaryRows, setSummaryRows] = useState<Ticket[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>('department');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     if (!projectId) {
@@ -38,56 +44,69 @@ const SummaryPage = () => {
       .catch(() => setDashboard(null));
   }, [projectId]);
 
-  const filtered = useMemo(() => {
-    if (deptFilter === 'All') return summaryTickets;
-    return summaryTickets.filter((tk) => tk.department === deptFilter);
-  }, [summaryTickets, deptFilter]);
-
-  const stats = useMemo(() => {
-    const total = dashboard?.totalTickets ?? filtered.length;
-    const completed = dashboard?.closedTickets ?? filtered.filter((t) => t.status === 'done').length;
-    const open = dashboard?.openTickets ?? filtered.filter((t) => t.status !== 'done').length;
-    const dueSoon = filtered.filter((t) => t.dueDate && new Date(t.dueDate) <= new Date(Date.now() + 7 * 86400000) && t.status !== 'done').length;
-
-    return [
-      { label: 'Completed', value: completed, icon: CheckCircle2, color: 'text-success' },
-      { label: 'Open', value: open, icon: ListChecks, color: 'text-primary' },
-      { label: 'Activity', value: allActivity.length, icon: ActivityIcon, color: 'text-info' },
-      { label: 'Due Soon', value: dueSoon, icon: CalendarClock, color: 'text-warning' },
-      { label: 'Total', value: total, icon: ListChecks, color: 'text-muted-foreground' },
-    ];
-  }, [dashboard, filtered, allActivity.length]);
-
-  const pieData = useMemo(() => {
-    if (dashboard?.byStatus) {
-      return (Object.keys(statusLabels) as TicketStatus[]).map((status) => ({
-        name: statusLabels[status],
-        value: Number(dashboard.byStatus[status] || 0),
-        color: statusColors[status],
-      }));
+  useEffect(() => {
+    if (!projectId) {
+      setSummaryRows([]);
+      return;
     }
+    ticketApi.getSummaryFiltered(projectId, {
+      department: listDeptFilter === 'All' ? undefined : listDeptFilter,
+      status: listStatusFilter === 'All' ? undefined : listStatusFilter,
+      sortBy: sortKey === 'assignee' ? 'assignee' : sortKey,
+      sortDir,
+    })
+      .then(setSummaryRows)
+      .catch(() => setSummaryRows([]));
+  }, [projectId, listDeptFilter, listStatusFilter, sortKey, sortDir]);
 
-    const counts: Record<TicketStatus, number> = { todo: 0, 'in-progress': 0, 'in-review': 0, done: 0 };
-    filtered.forEach((t) => {
-      counts[t.status] += 1;
-    });
-    return (Object.keys(counts) as TicketStatus[]).map((status) => ({
-      name: statusLabels[status],
-      value: counts[status],
-      color: statusColors[status],
-    }));
+  const filtered = useMemo(() => {
+    if (deptFilter === 'All') return summaryRows;
+    return summaryRows.filter((tk) => tk.department === deptFilter);
+  }, [summaryRows, deptFilter]);
+
+  const statusCounts = useMemo(() => {
+    const byStatus = dashboard?.byStatus || {};
+    const todo = Number(byStatus['todo'] || filtered.filter((t) => t.status === 'todo').length);
+    const inProgress = Number(byStatus['in-progress'] || filtered.filter((t) => t.status === 'in-progress').length);
+    const inReview = Number(byStatus['in-review'] || filtered.filter((t) => t.status === 'in-review').length);
+    const done = Number(byStatus['done'] || filtered.filter((t) => t.status === 'done').length);
+    const total = Number(dashboard?.totalTickets ?? filtered.length);
+    return { todo, inProgress, inReview, done, total };
   }, [dashboard, filtered]);
 
-  const totalTickets = pieData.reduce((sum, item) => sum + item.value, 0);
+  const stats = useMemo(() => {
+    return [
+      { label: 'Todo', value: statusCounts.todo, icon: ListChecks, color: 'text-muted-foreground' },
+      { label: 'In Progress', value: statusCounts.inProgress, icon: ListChecks, color: 'text-primary' },
+      { label: 'In Review', value: statusCounts.inReview, icon: ListChecks, color: 'text-warning' },
+      { label: 'Done', value: statusCounts.done, icon: CheckCircle2, color: 'text-success' },
+      { label: 'Total', value: statusCounts.total, icon: ListChecks, color: 'text-muted-foreground' },
+    ];
+  }, [statusCounts]);
+
+  const pieData = useMemo(() => ([
+    { name: statusLabels.todo, value: statusCounts.todo, color: statusColors.todo },
+    { name: statusLabels['in-progress'], value: statusCounts.inProgress, color: statusColors['in-progress'] },
+    { name: statusLabels['in-review'], value: statusCounts.inReview, color: statusColors['in-review'] },
+    { name: statusLabels.done, value: statusCounts.done, color: statusColors.done },
+  ]), [statusCounts]);
+
+  const totalTickets = statusCounts.total;
   const recentActivity = allActivity.slice(0, 15);
 
-  const filteredTicketList = useMemo(() => {
-    return summaryTickets.filter((ticket) => {
-      if (listDeptFilter !== 'All' && ticket.department !== listDeptFilter) return false;
-      if (listStatusFilter !== 'All' && ticket.status !== listStatusFilter) return false;
-      return true;
-    });
-  }, [summaryTickets, listDeptFilter, listStatusFilter]);
+  const sortIcon = (key: SortKey) => {
+    if (sortKey !== key) return '↕';
+    return sortDir === 'asc' ? '↑' : '↓';
+  };
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   const selectCls = 'h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
@@ -221,21 +240,21 @@ const SummaryPage = () => {
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Department</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Assignee</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('department')}>Department {sortIcon('department')}</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('status')}>Status {sortIcon('status')}</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('assignee')}>Assigned To {sortIcon('assignee')}</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {filteredTicketList.length === 0 && (
+              {summaryRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     No tickets found for selected filters.
                   </td>
                 </tr>
               )}
-              {filteredTicketList.map((ticket) => (
+              {summaryRows.map((ticket) => (
                 <tr key={ticket.id} className="border-b hover:bg-accent/40 transition-colors">
                   <td className="px-3 py-2">
                     <button
@@ -258,9 +277,7 @@ const SummaryPage = () => {
                       <span className="text-xs text-muted-foreground">Unassigned</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
-                    {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
-                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">{formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}</td>
                 </tr>
               ))}
             </tbody>

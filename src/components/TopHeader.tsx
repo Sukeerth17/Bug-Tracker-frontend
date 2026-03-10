@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
@@ -7,6 +7,7 @@ import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { notificationApi, NotificationItem } from '@/services/notificationApi';
+import { ticketApi } from '@/services/ticketApi';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -23,6 +24,8 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : 'sp1';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<typeof tickets>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -30,6 +33,11 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const userRef = useRef<HTMLDivElement>(null);
+
+  const isMac = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    return /Mac|iPhone|iPad/.test(navigator.platform);
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -57,15 +65,27 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const searchResults = searchQuery.trim()
-    ? tickets.filter((t) => {
-      const q = searchQuery.toLowerCase();
-      const matchesQuery = t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q);
-      if (!matchesQuery) return false;
-      if (t.status === 'done') return t.id.toLowerCase() === q;
-      return true;
-    })
-    : [];
+  useEffect(() => {
+    if (!searchQuery.trim() || !currentProjectId) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const handler = setTimeout(() => {
+      ticketApi.queryTickets(currentProjectId, {
+        q: searchQuery.trim(),
+        sortBy: 'updatedAt',
+        sortDir: 'desc',
+        page: 0,
+        size: 20,
+      })
+        .then((res) => setSearchResults(res.items))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearchLoading(false));
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery, currentProjectId]);
 
   useEffect(() => {
     Promise.all([
@@ -113,7 +133,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         {sidebarCollapsed ? <PanelLeft className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
       </button>
 
-      <div className="flex-1 max-w-xl relative" ref={searchRef}>
+      <div className="flex-1 min-w-0 max-w-xl relative" ref={searchRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -124,13 +144,17 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
             onFocus={() => setSearchOpen(true)}
             className="w-full h-9 pl-9 pr-16 rounded-lg bg-muted/60 border-0 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">Ctrl+K</kbd>
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">
+            {isMac ? '⌘K' : 'Ctrl K'}
+          </kbd>
         </div>
 
         {searchOpen && searchQuery.trim() && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
-            {searchResults.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No active tickets found.</p>
+            {searchLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Searching...</p>
+            ) : searchResults.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No results found.</p>
             ) : (
               searchResults.map((t) => (
                 <button
@@ -154,7 +178,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         )}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="ml-auto flex items-center gap-2">
         <button
           onClick={onNewTicket}
           className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"

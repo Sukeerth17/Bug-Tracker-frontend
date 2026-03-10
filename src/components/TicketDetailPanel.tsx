@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { X, MessageSquare, Activity, FileText } from 'lucide-react';
 import { statusLabels } from '@/data/models';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from './TicketBadges';
@@ -11,19 +11,77 @@ const TicketDetailPanel = () => {
   const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment, users } = useTickets();
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
-  const [editingAssignees, setEditingAssignees] = useState(false);
+  const [statusDraft, setStatusDraft] = useState<TicketStatus>('todo');
   const [assigneeIdsDraft, setAssigneeIdsDraft] = useState<string[]>([]);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const ticket = selectedTicket;
-  React.useEffect(() => {
+
+  useEffect(() => {
     if (!ticket) return;
+    setStatusDraft(ticket.status);
     setAssigneeIdsDraft(ticket.assignees.map((assignee) => assignee.id));
-    setEditingAssignees(false);
-  }, [ticket?.id, ticket?.assignees]);
+  }, [ticket?.id, ticket?.status, ticket?.assignees]);
+
+  const hasChanges = useMemo(() => {
+    if (!ticket) return false;
+    const statusChanged = statusDraft !== ticket.status;
+    const currentAssignees = ticket.assignees.map((a) => a.id).sort();
+    const draftAssignees = [...assigneeIdsDraft].sort();
+    const assigneesChanged = currentAssignees.length !== draftAssignees.length
+      || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
+    return statusChanged || assigneesChanged;
+  }, [ticket, statusDraft, assigneeIdsDraft]);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!hasChanges) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasChanges]);
 
   if (!ticket) return null;
+
+  const confirmClose = () => {
+    if (!hasChanges) {
+      setSelectedTicket(null);
+      return;
+    }
+    if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+      setSelectedTicket(null);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!ticket || !hasChanges) return;
+    setSaving(true);
+    try {
+      if (statusDraft !== ticket.status) {
+        await updateTicketStatus(ticket.id, statusDraft);
+      }
+      const currentAssignees = ticket.assignees.map((a) => a.id).sort();
+      const draftAssignees = [...assigneeIdsDraft].sort();
+      const assigneesChanged = currentAssignees.length !== draftAssignees.length
+        || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
+      if (assigneesChanged) {
+        await updateTicketAssignees(ticket.id, assigneeIdsDraft);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    if (!ticket) return;
+    setStatusDraft(ticket.status);
+    setAssigneeIdsDraft(ticket.assignees.map((a) => a.id));
+  };
+
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: FileText },
     { id: 'activity' as const, label: 'Activity', icon: Activity },
@@ -32,14 +90,14 @@ const TicketDetailPanel = () => {
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-foreground/20" onClick={() => setSelectedTicket(null)} />
+      <div className="fixed inset-0 z-40 bg-foreground/20" onClick={confirmClose} />
       <div className="fixed right-0 top-0 h-screen w-full max-w-[600px] bg-card border-l shadow-2xl z-50 flex flex-col animate-slide-in-right">
         <div className="flex items-center justify-between p-4 border-b shrink-0">
           <div className="flex items-center gap-2">
             <TypeIcon type={ticket.type} />
             <span className="font-mono text-xs text-muted-foreground">{ticket.id}</span>
           </div>
-          <button onClick={() => setSelectedTicket(null)} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
+          <button onClick={confirmClose} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="px-4 pt-4 pb-2 shrink-0">
@@ -48,14 +106,32 @@ const TicketDetailPanel = () => {
 
         <div className="px-4 pb-3 flex items-center gap-2 shrink-0">
           <select
-            value={ticket.status}
-            onChange={e => updateTicketStatus(ticket.id, e.target.value as TicketStatus)}
+            value={statusDraft}
+            onChange={e => setStatusDraft(e.target.value as TicketStatus)}
             className="h-7 rounded-full text-xs font-medium border-0 bg-muted px-3 focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <PriorityIcon priority={ticket.priority} />
           <DeptBadge department={ticket.department} />
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!hasChanges || saving}
+              onClick={handleSave}
+              className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs disabled:opacity-60"
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              disabled={!hasChanges || saving}
+              onClick={handleCancel}
+              className="h-7 px-3 rounded-md border text-xs disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
 
         <div className="flex border-b px-4 shrink-0">
@@ -96,40 +172,18 @@ const TicketDetailPanel = () => {
                       <><GhostAvatar /><span className="text-sm text-muted-foreground">Unassigned</span></>
                     )}
                   </div>
-                  <div className="mt-2 space-y-2">
-                    {editingAssignees ? (
-                      <>
-                        <select
-                          value={assigneeIdsDraft}
-                          onChange={(e) => setAssigneeIdsDraft(Array.from(e.target.selectedOptions, (option) => option.value))}
-                          className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                          multiple
-                        >
-                          {users.map((user) => (
-                            <option key={user.id} value={user.id}>{user.name}</option>
-                          ))}
-                        </select>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs"
-                            onClick={async () => {
-                              await updateTicketAssignees(ticket.id, assigneeIdsDraft);
-                              setEditingAssignees(false);
-                            }}
-                          >
-                            Save
-                          </button>
-                          <button type="button" className="h-8 px-3 rounded-md border text-xs" onClick={() => setEditingAssignees(false)}>
-                            Cancel
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <button type="button" className="h-8 px-3 rounded-md border text-xs" onClick={() => setEditingAssignees(true)}>
-                        Edit Assignees
-                      </button>
-                    )}
+                  <div className="mt-2">
+                    <select
+                      value={assigneeIdsDraft}
+                      onChange={(e) => setAssigneeIdsDraft(Array.from(e.target.selectedOptions, (option) => option.value))}
+                      className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      multiple
+                    >
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>{user.name}</option>
+                      ))}
+                    </select>
+                    <p className="text-[10px] text-muted-foreground mt-1">Hold Ctrl/Cmd to select multiple users.</p>
                   </div>
                 </div>
                 <div>
@@ -253,7 +307,7 @@ const TicketDetailPanel = () => {
               onClick={() => setPreviewAttachment(null)}
               className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-card border text-foreground flex items-center justify-center"
             >
-              x
+              ×
             </button>
           </div>
         </div>

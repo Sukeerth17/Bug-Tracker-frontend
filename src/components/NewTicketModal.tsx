@@ -66,7 +66,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
   React.useEffect(() => {
     if (!open || !projectId) return;
-    ticketApi.getUsers(projectId)
+    ticketApi.getUsers(projectId, true)
       .then((rows) => {
         setAvailableUsers(rows);
         setAssigneeIds((prev) => {

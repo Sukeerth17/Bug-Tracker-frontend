@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge } from '@/components/TicketBadges';
 import { Ticket } from '@/data/models';
@@ -7,27 +7,21 @@ import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 
 const ForYouPage = () => {
-  const { setSelectedTicket, currentUser } = useTickets();
+  const { setSelectedTicket } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
 
   useEffect(() => {
-    if (!projectId || !currentUser.id) {
+    if (!projectId) {
       setMyTickets([]);
       return;
     }
 
-    ticketApi.queryTickets(projectId, {
-      assigneeId: Number(currentUser.id),
-      sortBy: 'updatedAt',
-      sortDir: 'desc',
-      page: 0,
-      size: 200,
-    })
-      .then((res) => setMyTickets(res.items))
+    ticketApi.getForYou(projectId)
+      .then((res) => setMyTickets(res))
       .catch(() => setMyTickets([]));
-  }, [projectId, currentUser.id]);
+  }, [projectId]);
 
   return (
     <div className="p-6 space-y-4 max-w-4xl mx-auto">

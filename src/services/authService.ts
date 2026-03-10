@@ -8,6 +8,7 @@ interface AuthResponse {
   user: {
     id: number;
     name: string;
+    username?: string;
     email: string;
     avatar: string;
     role: 'USER' | 'SUPER_ADMIN';
@@ -18,6 +19,7 @@ function mapUser(user: AuthResponse['user']): User {
   return {
     id: String(user.id),
     name: user.name,
+    username: user.username,
     email: user.email,
     avatar: user.avatar,
     role: user.role,
@@ -40,11 +42,6 @@ export const authService = {
 
   async login(payload: { email: string; password: string }) {
     const response = await api.post<AuthResponse>('/auth/login', payload);
-    return persistAuth(response.data);
-  },
-
-  async googleLogin(idToken: string) {
-    const response = await api.post<AuthResponse>('/auth/google/login', { idToken });
     return persistAuth(response.data);
   },
 

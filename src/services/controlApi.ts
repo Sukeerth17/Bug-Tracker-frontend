@@ -1,7 +1,5 @@
-﻿export const API_CONTROL_KEYS = {
-  baseUrl: 'ticket.api.baseUrl',
-  requesterUserId: 'ticket.api.requesterUserId',
-};
+const ENV_API_BASE_URL = ((import.meta as any).env?.VITE_API_URL as string | undefined)?.trim();
+const ENV_REQUESTER_USER_ID = ((import.meta as any).env?.VITE_REQUESTER_USER_ID as string | undefined)?.trim();
 
 export const API_ENDPOINTS = {
   health: '/health',
@@ -15,7 +13,6 @@ export const API_ENDPOINTS = {
   summary: '/tickets/summary',
   projects: '/projects',
   projectById: '/projects/{projectId}',
-  googleOnboardUser: '/users/google-onboard',
   userById: '/users/{userId}',
   notifications: '/notifications',
   notificationRead: '/notifications/{notificationId}/read',
@@ -24,18 +21,17 @@ export const API_ENDPOINTS = {
 };
 
 export function getApiBaseUrl(): string {
-  return localStorage.getItem(API_CONTROL_KEYS.baseUrl) || 'http://localhost:8080/api';
+  return ENV_API_BASE_URL || 'http://localhost:8080/api';
 }
 
-export function setApiBaseUrl(url: string) {
-  localStorage.setItem(API_CONTROL_KEYS.baseUrl, url.trim() || 'http://localhost:8080/api');
+export function setApiBaseUrl(_url: string) {
+  // Env-only mode: base URL is controlled by VITE_API_URL.
 }
 
 export function getRequesterUserId(): string { 
-  return localStorage.getItem(API_CONTROL_KEYS.requesterUserId) || '1';
+  return ENV_REQUESTER_USER_ID || '1';
 }
 
-export function setRequesterUserId(userId: string) {
-  localStorage.setItem(API_CONTROL_KEYS.requesterUserId, userId.trim() || '1');
+export function setRequesterUserId(_userId: string) {
+  // Env-only mode: requester user id is controlled by VITE_REQUESTER_USER_ID.
 }
-
