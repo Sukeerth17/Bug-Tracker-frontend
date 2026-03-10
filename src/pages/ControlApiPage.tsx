@@ -9,7 +9,6 @@ const ControlApiPage = () => {
   const [requesterUserId, setRequesterUserIdLocal] = useState(getRequesterUserId());
   const [saving, setSaving] = useState(false);
   const [newUserName, setNewUserName] = useState('');
-  const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserAvatar, setNewUserAvatar] = useState('');
@@ -31,19 +30,17 @@ const ControlApiPage = () => {
   };
 
   const handleCreateUser = async () => {
-    if (!newUserName.trim() || !newUserUsername.trim() || !newUserEmail.trim() || !newUserPassword.trim() || !newUserAvatar.trim()) return;
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim() || !newUserAvatar.trim()) return;
     setSaving(true);
     try {
       const created = await ticketApi.createUser({
         name: newUserName.trim(),
-        username: newUserUsername.trim(),
         email: newUserEmail.trim(),
         password: newUserPassword,
         avatar: newUserAvatar.trim(),
       });
       // reflect immediately in UI
       setNewUserName('');
-      setNewUserUsername('');
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserAvatar('');
@@ -119,12 +116,6 @@ const ControlApiPage = () => {
             onChange={(e) => setNewUserName(e.target.value)}
             className="h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
             placeholder="Name"
-          />
-          <input
-            value={newUserUsername}
-            onChange={(e) => setNewUserUsername(e.target.value)}
-            className="h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-            placeholder="Username"
           />
           <input
             value={newUserEmail}

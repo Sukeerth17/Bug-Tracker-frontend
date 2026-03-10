@@ -5,7 +5,6 @@ import { API_ENDPOINTS } from '@/services/controlApi';
 interface ApiUser {
   id: number;
   name: string;
-  username?: string;
   email: string;
   avatar: string;
   role?: 'USER' | 'SUPER_ADMIN';
@@ -88,7 +87,6 @@ function mapUser(user: ApiUser | null): User | null {
   return {
     id: String(user.id),
     name: user.name,
-    username: user.username,
     email: user.email,
     avatar: user.avatar,
     role: user.role || 'USER',
@@ -150,7 +148,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
 type CreateUserResponse = { user: ApiUser; emailSent: boolean; warning?: string | null };
 
 export const ticketApi = {
-  async createUser(payload: { name: string; username: string; email: string; password: string; avatar: string }): Promise<{ user: User; emailSent: boolean; warning?: string }> {
+  async createUser(payload: { name: string; email: string; password: string; avatar: string }): Promise<{ user: User; emailSent: boolean; warning?: string }> {
     const response = await api.post<CreateUserResponse>(API_ENDPOINTS.users, payload);
     return {
       user: mapUser(response.data.user) as User,

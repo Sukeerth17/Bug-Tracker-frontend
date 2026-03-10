@@ -8,7 +8,6 @@ interface AuthResponse {
   user: {
     id: number;
     name: string;
-    username?: string;
     email: string;
     avatar: string;
     role: 'USER' | 'SUPER_ADMIN';
@@ -19,7 +18,6 @@ function mapUser(user: AuthResponse['user']): User {
   return {
     id: String(user.id),
     name: user.name,
-    username: user.username,
     email: user.email,
     avatar: user.avatar,
     role: user.role,

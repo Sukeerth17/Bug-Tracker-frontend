@@ -9,7 +9,6 @@ const AdminUsersPage = () => {
   const [loading, setLoading] = React.useState(true);
   const [saving, setSaving] = React.useState(false);
   const [name, setName] = React.useState('');
-  const [username, setUsername] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [avatar, setAvatar] = React.useState('');
@@ -37,7 +36,6 @@ const AdminUsersPage = () => {
     try {
       const result = await ticketApi.createUser({
         name: name.trim(),
-        username: username.trim(),
         email: email.trim(),
         password,
         avatar: avatar.trim() || 'US',
@@ -47,7 +45,6 @@ const AdminUsersPage = () => {
         toast(result.warning, { description: 'User was created but email delivery failed.' });
       }
       setName('');
-      setUsername('');
       setEmail('');
       setPassword('');
       setAvatar('');
@@ -86,7 +83,6 @@ const AdminUsersPage = () => {
       <form onSubmit={handleAdd} className="bg-card rounded-xl border p-4 space-y-3">
         <div className="grid md:grid-cols-3 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Full name" required />
-          <input value={username} onChange={(e) => setUsername(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Username" required />
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="email" placeholder="Gmail address" required />
           <input value={password} onChange={(e) => setPassword(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="password" placeholder="Password (min 8 chars)" required minLength={8} />
           <input value={avatar} onChange={(e) => setAvatar(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2" placeholder="Avatar initials" />
