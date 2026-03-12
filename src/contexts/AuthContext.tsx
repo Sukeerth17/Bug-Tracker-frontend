@@ -25,9 +25,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string>(() => getAuthToken());
 
   useEffect(() => {
-    authService.logout();
-    setUser(null);
-    setToken('');
+    // Keep existing session across refresh; login required only when no stored auth.
   }, []);
 
   const login = async (email: string, password: string) => {

@@ -132,6 +132,21 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
 
   const unreadNotifications = notifications.filter((item) => !item.isRead);
 
+  const renderNotificationMessage = (message: string) => {
+    const byIndex = message.lastIndexOf(' by ');
+    if (byIndex === -1) {
+      return <span>{message}</span>;
+    }
+    const prefix = message.slice(0, byIndex + 4);
+    const name = message.slice(byIndex + 4);
+    return (
+      <span>
+        {prefix}
+        <span className="font-semibold text-foreground">{name}</span>
+      </span>
+    );
+  };
+
   const markNotificationRead = async (notificationId: number) => {
     const updated = await notificationApi.markRead(notificationId);
     setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
@@ -139,6 +154,22 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
   };
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    if (unreadNotifications.length === 0) return;
+    const unreadIds = unreadNotifications.map((n) => n.id);
+    Promise.all(unreadIds.map((id) => notificationApi.markRead(id)))
+      .then((updatedList) => {
+        setNotifications((prev) =>
+          prev.map((item) => updatedList.find((u) => u.id === item.id) ?? item)
+        );
+        setUnreadCount(0);
+      })
+      .catch(() => {
+        // ignore read failures
+      });
+  }, [notifOpen, unreadNotifications.length]);
 
   return (
     <header
@@ -251,7 +282,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                         <span className="font-mono text-[11px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">{notification.ticketId || 'notice'}</span>
                         <span className="text-sm font-medium truncate flex-1">{notification.ticketTitle || 'Notification'}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground mb-1">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground mb-1">{renderNotificationMessage(notification.message)}</p>
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-muted-foreground">{notification.eventType}</span>
                         <span className="text-[11px] text-muted-foreground">{formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}</span>
