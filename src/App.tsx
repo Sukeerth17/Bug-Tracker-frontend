@@ -15,6 +15,7 @@ import ForYouPage from "@/pages/ForYouPage";
 import RecentPage from "@/pages/RecentPage";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import AdminProjectsPage from "@/pages/AdminProjectsPage";
 import AdminUsersPage from "@/pages/AdminUsersPage";
 import NotFound from "./pages/NotFound";
@@ -61,6 +62,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route element={<ProtectedApp />}>
 

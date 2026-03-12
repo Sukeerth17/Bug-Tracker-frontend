@@ -18,10 +18,12 @@ export const projectApi = {
 
   async createProject(payload: { name: string; description?: string; startDate?: string }) {
     const response = await api.post<ProjectItem>(API_ENDPOINTS.projects, payload);
+    window.dispatchEvent(new CustomEvent('projects:changed'));
     return response.data;
   },
 
   async deleteProject(projectId: string) {
     await api.delete(API_ENDPOINTS.projectById.replace('{projectId}', projectId));
+    window.dispatchEvent(new CustomEvent('projects:changed'));
   },
 };

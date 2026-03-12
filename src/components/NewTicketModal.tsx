@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { X, CloudUpload } from 'lucide-react';
+import React, { useState } from 'react';
+import { X } from 'lucide-react';
 import { useTickets } from '@/contexts/TicketContext';
 import { departments, statusLabels, priorityLabels, typeLabels } from '@/data/models';
 import type { TicketStatus, TicketPriority, TicketType, Department } from '@/data/models';
@@ -36,20 +36,8 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [creatingFeature, setCreatingFeature] = useState(false);
   const [featureError, setFeatureError] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
-  const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string } | null>(null);
-  const [attachError, setAttachError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const readFileAsDataUrl = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result || ''));
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsDataURL(file);
-    });
 
   React.useEffect(() => {
     if (!open) return;
@@ -116,37 +104,6 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
   if (!open) return null;
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files) return;
-    setAttachError('');
-    const remaining = 5 - attachments.length;
-    const fileArr = Array.from(files).slice(0, remaining);
-    const nextAttachments: { url: string; name: string }[] = [];
-
-    for (const file of fileArr) {
-      if (!file.type.startsWith('image/')) {
-        setAttachError('Only image files are supported.');
-        continue;
-      }
-      if (file.size > 500 * 1024) {
-        setAttachError('Max 500KB per file.');
-        continue;
-      }
-      const url = await readFileAsDataUrl(file);
-      nextAttachments.push({ url, name: file.name });
-    }
-    if (nextAttachments.length > 0) {
-      setAttachments(prev => [...prev, ...nextAttachments]);
-    }
-  };
-
-  const removeAttachment = (idx: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== idx));
-    if (previewAttachment && previewAttachment.url === attachments[idx]?.url) {
-      setPreviewAttachment(null);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || assigneeIds.length === 0 || !projectId || !featureId) return;
@@ -165,7 +122,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         status,
         assignees: availableUsers.filter((user) => assigneeIds.includes(user.id)),
         dueDate: dueDate || null,
-        attachments: attachments.map((file) => file.url),
+        attachments: [],
       });
       onClose();
       setTitle('');
@@ -177,9 +134,6 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setStatus('todo');
       setFeatureId('');
       setDueDate('');
-      setAttachments([]);
-      setAttachError('');
-      setPreviewAttachment(null);
       setSubmitError('');
     } catch (err: any) {
       setSubmitError(err?.response?.data?.message || 'Failed to create ticket');
@@ -328,34 +282,6 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             )}
           </div>
 
-          <div>
-            <label className={labelCls}>Attachments</label>
-            <div
-              onClick={() => attachments.length < 5 && fileRef.current?.click()}
-              onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
-              onDrop={e => { e.preventDefault(); e.stopPropagation(); handleFiles(e.dataTransfer.files); }}
-              className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center gap-1 cursor-pointer hover:border-primary/50 transition-colors"
-            >
-              <CloudUpload className="h-6 w-6 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Drag & drop images here, or click to browse</span>
-              <span className="text-[10px] text-muted-foreground">Supports: JPG, JPEG, PNG, GIF, WEBP — Max 500KB per file</span>
-            </div>
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
-            {attachError && <p className="text-xs text-destructive mt-1">{attachError}</p>}
-            {attachments.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {attachments.map((a, i) => (
-                  <div key={i} className="relative h-20 w-20 rounded-md overflow-hidden border">
-                    <button type="button" onClick={() => setPreviewAttachment(a)} className="h-full w-full">
-                      <img src={a.url} alt={a.name} className="h-full w-full object-cover" />
-                    </button>
-                    <button type="button" onClick={() => removeAttachment(i)} className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-[10px]">×</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
             <button type="submit" disabled={submitting || availableUsers.length === 0 || assigneeIds.length === 0 || !projectId || !featureId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
@@ -363,20 +289,6 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
           {submitError && <p className="text-xs text-destructive">{submitError}</p>}
         </form>
       </div>
-      {previewAttachment && (
-        <div className="fixed inset-0 z-[60] bg-black/70 flex items-center justify-center p-4" onClick={() => setPreviewAttachment(null)}>
-          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-            <img src={previewAttachment.url} alt={previewAttachment.name} className="max-h-[90vh] max-w-full rounded-lg shadow-2xl" />
-            <button
-              type="button"
-              onClick={() => setPreviewAttachment(null)}
-              className="absolute -top-3 -right-3 h-8 w-8 rounded-full bg-card border text-foreground flex items-center justify-center"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

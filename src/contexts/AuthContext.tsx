@@ -1,4 +1,4 @@
-import React, { createContext, ReactNode, useContext, useMemo, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { User } from '@/data/models';
 import { authService } from '@/services/authService';
 import { getAuthToken, getAuthUser } from '@/services/authStorage';
@@ -23,6 +23,12 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(() => getAuthUser());
   const [token, setToken] = useState<string>(() => getAuthToken());
+
+  useEffect(() => {
+    authService.logout();
+    setUser(null);
+    setToken('');
+  }, []);
 
   const login = async (email: string, password: string) => {
     const loggedInUser = await authService.login({ email, password });

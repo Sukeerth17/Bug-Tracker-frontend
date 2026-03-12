@@ -41,6 +41,7 @@ const AdminUsersPage = () => {
         avatar: avatar.trim() || 'US',
       });
       setUsers((prev) => [result.user, ...prev]);
+      toast('User created');
       if (!result.emailSent && result.warning) {
         toast(result.warning, { description: 'User was created but email delivery failed.' });
       }

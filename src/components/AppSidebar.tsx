@@ -30,9 +30,19 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const parts = location.pathname.split('/');
   const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || '');
 
-  React.useEffect(() => {
+  const loadProjects = React.useCallback(() => {
     projectApi.getProjects().then(setProjects).catch(() => setProjects([]));
-  }, [location.pathname]);
+  }, []);
+
+  React.useEffect(() => {
+    loadProjects();
+  }, [loadProjects, location.pathname]);
+
+  React.useEffect(() => {
+    const handler = () => loadProjects();
+    window.addEventListener('projects:changed', handler);
+    return () => window.removeEventListener('projects:changed', handler);
+  }, [loadProjects]);
 
   React.useEffect(() => {
     if (projects.length === 0) {
