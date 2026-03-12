@@ -302,6 +302,10 @@ const TicketDetailPanel = () => {
                   <p className="text-sm mt-1">{ticket.dueDate ? format(new Date(ticket.dueDate), 'MMM d, yyyy') : '-'}</p>
                 </div>
                 <div>
+                  <label className="text-xs font-medium text-muted-foreground">Completed</label>
+                  <p className="text-sm mt-1">{ticket.doneAt ? format(new Date(ticket.doneAt), 'MMM d, yyyy, h:mm a') : '-'}</p>
+                </div>
+                <div>
                   <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <div className="flex items-center gap-1.5 mt-1"><TypeIcon type={ticket.type} /><span className="text-sm capitalize">{ticket.type}</span></div>
                 </div>

@@ -2,13 +2,14 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   User, Clock,
-  LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users, Plus,
+  LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users, Plus, Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getProjectIdFromPathname, setActiveProjectId } from '@/services/projectControl';
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { featureApi, FeatureItem } from '@/services/featureApi';
 import { useAuth } from '@/contexts/AuthContext';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -26,6 +27,8 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const [expandedFeatures, setExpandedFeatures] = React.useState<Set<string>>(new Set());
   const [creatingForProject, setCreatingForProject] = React.useState<string | null>(null);
   const [newFeatureName, setNewFeatureName] = React.useState('');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
+  const [pendingDelete, setPendingDelete] = React.useState<{ projectId: string; featureId: string } | null>(null);
 
   const parts = location.pathname.split('/');
   const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || '');
@@ -129,7 +132,25 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     setExpandedFeatureSections((prev) => new Set(prev).add(projectId));
   };
 
+  const requestDeleteFeature = (projectId: string, featureId: string) => {
+    setPendingDelete({ projectId, featureId });
+    setConfirmDeleteOpen(true);
+  };
+
+  const confirmDeleteFeature = async () => {
+    if (!pendingDelete) return;
+    const { projectId, featureId } = pendingDelete;
+    await featureApi.deleteFeature(projectId, featureId);
+    setFeaturesByProject((prev) => ({
+      ...prev,
+      [projectId]: (prev[projectId] || []).filter((f) => f.id !== featureId),
+    }));
+    setConfirmDeleteOpen(false);
+    setPendingDelete(null);
+  };
+
   return (
+    <>
     <aside
       className={cn(
         'fixed left-0 top-0 h-screen bg-sidebar text-sidebar-foreground flex flex-col z-40 transition-all duration-200 border-r border-sidebar-border',
@@ -290,7 +311,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                                 </div>
                               )}
                               {(featuresByProject[project.id] || []).map((feature) => (
-                                <div key={feature.id} className="space-y-1">
+                                  <div key={feature.id} className="space-y-1">
                                   <div className="flex items-center gap-1 px-2">
                                     <button
                                       onClick={() => toggleFeatureExpanded(feature.id)}
@@ -308,6 +329,13 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                                       className="flex-1 text-left text-sm text-sidebar-muted hover:text-sidebar-foreground"
                                     >
                                       {feature.name}
+                                    </button>
+                                    <button
+                                      onClick={() => requestDeleteFeature(project.id, feature.id)}
+                                      className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-sidebar-accent text-sidebar-muted hover:text-destructive"
+                                      aria-label="Delete feature"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
                                     </button>
                                   </div>
                                   {expandedFeatures.has(feature.id) && (
@@ -391,6 +419,20 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
         </div>
       </nav>
     </aside>
+    <ConfirmationModal
+      isOpen={confirmDeleteOpen}
+      title="Delete Feature"
+      message="Delete this feature? Tickets will remain but no longer be linked to this feature."
+      confirmLabel="Delete"
+      cancelLabel="Cancel"
+      variant="danger"
+      onConfirm={confirmDeleteFeature}
+      onCancel={() => {
+        setConfirmDeleteOpen(false);
+        setPendingDelete(null);
+      }}
+    />
+    </>
   );
 };
 

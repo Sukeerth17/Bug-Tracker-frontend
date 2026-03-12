@@ -19,4 +19,10 @@ export const featureApi = {
     const response = await api.post<FeatureItem>(API_ENDPOINTS.features, { projectId, name });
     return { ...response.data, id: String(response.data.id) };
   },
+
+  async deleteFeature(projectId: string, featureId: string | number): Promise<void> {
+    await api.delete(API_ENDPOINTS.featureById.replace('{featureId}', String(featureId)), {
+      params: { projectId },
+    });
+  },
 };

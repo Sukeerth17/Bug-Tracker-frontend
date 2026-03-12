@@ -53,6 +53,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
   const updateTicketStatus = useCallback(async (projectId: string, id: string, status: TicketStatus) => {
     const updated = await ticketApi.updateStatus(projectId, id, status);
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
   }, []);
 
   const createTicket = useCallback(async (data: {
@@ -90,7 +91,14 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
   const updateTicketAssignees = useCallback(async (projectId: string, id: string, assigneeIds: string[]) => {
     const updated = await ticketApi.updateAssignees(projectId, id, assigneeIds.map(Number));
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
-  }, []);
+    const stillVisible = currentUser.role === 'SUPER_ADMIN'
+      || updated.reporter?.id === currentUser.id
+      || updated.assignees.some((assignee) => assignee.id === currentUser.id);
+    if (!stillVisible) {
+      setSelectedTicket(null);
+    }
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
+  }, [currentUser]);
 
   const addTicketComment = useCallback(async (projectId: string, id: string, text: string) => {
     if (!text.trim()) return;

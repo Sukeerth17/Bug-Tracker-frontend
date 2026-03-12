@@ -45,6 +45,7 @@ export interface Ticket {
   assignees: User[];
   reporter: User;
   dueDate: string | null;
+  doneAt?: string | null;
   starred: boolean;
   createdAt: string;
   updatedAt: string;

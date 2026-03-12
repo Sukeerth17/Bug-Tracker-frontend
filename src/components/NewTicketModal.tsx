@@ -38,6 +38,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [dueDate, setDueDate] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const createStatusOptions: TicketStatus[] = ['todo', 'in-progress'];
 
   React.useEffect(() => {
     if (!open) return;
@@ -240,7 +241,9 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             <div>
               <label className={labelCls}>Status</label>
               <select value={status} onChange={e => setStatus(e.target.value as TicketStatus)} className={selectCls}>
-                {(Object.entries(statusLabels)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {createStatusOptions.map((k) => (
+                  <option key={k} value={k}>{statusLabels[k]}</option>
+                ))}
               </select>
             </div>
             <div>

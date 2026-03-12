@@ -44,6 +44,7 @@ interface ApiTicket {
   assignees?: ApiUser[];
   reporter: ApiUser | null;
   dueDate: string | null;
+  doneAt?: string | null;
   starred: boolean;
   createdAt: string;
   updatedAt: string;
@@ -138,6 +139,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
     assignees: mappedAssignees,
     reporter: mapUser(ticket.reporter) || fallbackReporter,
     dueDate: ticket.dueDate,
+    doneAt: ticket.doneAt ?? null,
     starred: ticket.starred,
     createdAt: ticket.createdAt,
     updatedAt: ticket.updatedAt,

@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   notificationStream: '/notifications/stream',
   dashboardSummary: '/dashboard/summary',
   features: '/features',
+  featureById: '/features/{featureId}',
 };
 
 export function getApiBaseUrl(): string {

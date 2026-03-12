@@ -68,7 +68,11 @@ const BoardPage = () => {
   useEffect(() => {
     const handler = () => loadBoard();
     window.addEventListener('ticket:created', handler as EventListener);
-    return () => window.removeEventListener('ticket:created', handler as EventListener);
+    window.addEventListener('ticket:updated', handler as EventListener);
+    return () => {
+      window.removeEventListener('ticket:created', handler as EventListener);
+      window.removeEventListener('ticket:updated', handler as EventListener);
+    };
   }, [loadBoard]);
 
   const onDragEnd = (result: DropResult) => {
