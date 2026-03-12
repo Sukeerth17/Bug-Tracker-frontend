@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download, Paperclip } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useParams } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 
@@ -17,7 +17,9 @@ type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'du
 const ListPage = () => {
   const { setSelectedTicket } = useTickets();
   const location = useLocation();
+  const { spaceId, featureId } = useParams();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const isFeatureView = Boolean(featureId);
 
   const [rows, setRows] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,7 @@ const ListPage = () => {
     setLoading(true);
     try {
       const response = await ticketApi.queryTickets(projectId, {
+        featureId: featureId || undefined,
         q: search.trim() || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         priority: priorityFilter === 'all' ? undefined : priorityFilter,
@@ -63,10 +66,16 @@ const ListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, search, statusFilter, priorityFilter, sortKey, sortAsc, page, pageSize]);
+  }, [projectId, featureId, search, statusFilter, priorityFilter, sortKey, sortAsc, page, pageSize]);
 
   useEffect(() => {
     loadTickets();
+  }, [loadTickets]);
+
+  useEffect(() => {
+    const handler = () => loadTickets();
+    window.addEventListener('ticket:created', handler as EventListener);
+    return () => window.removeEventListener('ticket:created', handler as EventListener);
   }, [loadTickets]);
 
   useEffect(() => {
@@ -128,8 +137,32 @@ const ListPage = () => {
 
   return (
     <div className="p-6 space-y-4 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">List</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {spaceId && (
+            <div className="inline-flex items-center rounded-lg border bg-muted/40 p-1 text-xs">
+              <NavLink
+                to={featureId ? `/space/${spaceId}/feature/${featureId}/board` : `/space/${spaceId}/board`}
+                className={({ isActive }) => cn(
+                  'px-3 py-1 rounded-md transition-colors',
+                  isActive ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Board
+              </NavLink>
+              <NavLink
+                to={featureId ? `/space/${spaceId}/feature/${featureId}/list` : `/space/${spaceId}/list`}
+                className={({ isActive }) => cn(
+                  'px-3 py-1 rounded-md transition-colors',
+                  isActive ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                List
+              </NavLink>
+            </div>
+          )}
+          <h1 className="text-xl font-semibold">List</h1>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => window.dispatchEvent(new CustomEvent('ticket:new', { detail: { status: 'todo' } }))}
@@ -225,12 +258,24 @@ const ListPage = () => {
                           {ticket.attachments.length}
                         </span>
                       )}
-                      <button
-                        onClick={() => setSelectedTicket(ticket)}
-                        className="text-sm hover:text-primary hover:underline transition-colors truncate max-w-xs text-left"
-                      >
-                        {ticket.title}
-                      </button>
+                      <div className="min-w-0">
+                        <button
+                          onClick={() => setSelectedTicket(ticket)}
+                          className="text-sm hover:text-primary hover:underline transition-colors truncate max-w-xs text-left"
+                        >
+                          {ticket.title}
+                        </button>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {ticket.projectId}
+                          </span>
+                          {ticket.featureName && (
+                            <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                              {ticket.featureName}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-3 py-2">

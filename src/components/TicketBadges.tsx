@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { TicketStatus, TicketPriority, TicketType, Department, statusLabels, priorityLabels, typeLabels } from '@/data/models';
-import { Bug, CheckSquare, Bookmark, Zap, ChevronsUp, ChevronUp, Equal, ChevronDown } from 'lucide-react';
+import { Bug, CheckSquare, Zap, ChevronsUp, ChevronUp, Equal, ChevronDown } from 'lucide-react';
 
 export const StatusBadge = ({ status, onClick }: { status: TicketStatus; onClick?: () => void }) => {
   const cls = {
@@ -37,7 +37,6 @@ export const TypeIcon = ({ type }: { type: TicketType }) => {
   const icons = {
     bug: <Bug className="h-3.5 w-3.5 text-destructive" />,
     task: <CheckSquare className="h-3.5 w-3.5 text-primary" />,
-    story: <Bookmark className="h-3.5 w-3.5 text-info" />,
     improvement: <Zap className="h-3.5 w-3.5 text-warning" />,
   };
   return icons[type];

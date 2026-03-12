@@ -78,9 +78,17 @@ function App() {
                 path="/space/:spaceId/list"
                 element={<ListPage />}
               />
+              <Route
+                path="/space/:spaceId/feature/:featureId/list"
+                element={<ListPage />}
+              />
 
               <Route
                 path="/space/:spaceId/board"
+                element={<BoardPage />}
+              />
+              <Route
+                path="/space/:spaceId/feature/:featureId/board"
                 element={<BoardPage />}
               />
 

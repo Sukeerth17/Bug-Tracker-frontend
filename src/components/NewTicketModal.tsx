@@ -4,9 +4,10 @@ import { useTickets } from '@/contexts/TicketContext';
 import { departments, statusLabels, priorityLabels, typeLabels } from '@/data/models';
 import type { TicketStatus, TicketPriority, TicketType, Department } from '@/data/models';
 import { useLocation } from 'react-router-dom';
-import { resolveProjectId, setActiveProjectId } from '@/services/projectControl';
+import { resolveFeatureId, resolveProjectId, setActiveProjectId } from '@/services/projectControl';
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { ticketApi } from '@/services/ticketApi';
+import { featureApi, FeatureItem } from '@/services/featureApi';
 import type { User } from '@/data/models';
 import { UserAvatar } from '@/components/TicketBadges';
 
@@ -21,6 +22,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const { createTicket } = useTickets();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [features, setFeatures] = useState<FeatureItem[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [department, setDepartment] = useState<Department>('Website');
@@ -29,6 +31,10 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [status, setStatus] = useState<TicketStatus>(defaultStatus);
   const [projectId, setProjectId] = useState('');
+  const [featureId, setFeatureId] = useState('');
+  const [newFeatureName, setNewFeatureName] = useState('');
+  const [creatingFeature, setCreatingFeature] = useState(false);
+  const [featureError, setFeatureError] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState<{ url: string; name: string }[]>([]);
   const [previewAttachment, setPreviewAttachment] = useState<{ url: string; name: string } | null>(null);
@@ -50,6 +56,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
     setStatus(defaultStatus);
     const activeProjectId = resolveProjectId(location.pathname);
+    const activeFeatureId = resolveFeatureId(location.pathname);
 
     projectApi.getProjects()
       .then((rows) => {
@@ -58,6 +65,9 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
           setProjectId(activeProjectId);
         } else if (rows.length > 0) {
           setProjectId(rows[0].id);
+        }
+        if (activeFeatureId) {
+          setFeatureId(activeFeatureId);
         }
       })
       .catch(() => setProjects([]));
@@ -83,6 +93,27 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       });
   }, [open, projectId]);
 
+  React.useEffect(() => {
+    if (!open || !projectId) return;
+    featureApi.getFeatures(projectId)
+      .then((rows) => {
+        setFeatures(rows);
+        if (featureId && rows.some((f) => f.id === featureId)) {
+          return;
+        }
+        if (rows.length > 0) {
+          setFeatureId(rows[0].id);
+        }
+      })
+      .catch(() => setFeatures([]));
+  }, [open, projectId]);
+  React.useEffect(() => {
+    if (!open) return;
+    setNewFeatureName('');
+    setCreatingFeature(false);
+    setFeatureError('');
+  }, [open, projectId]);
+
   if (!open) return null;
 
   const handleFiles = async (files: FileList | null) => {
@@ -97,8 +128,8 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         setAttachError('Only image files are supported.');
         continue;
       }
-      if (file.size > 5 * 1024 * 1024) {
-        setAttachError('Max 5MB per file.');
+      if (file.size > 500 * 1024) {
+        setAttachError('Max 500KB per file.');
         continue;
       }
       const url = await readFileAsDataUrl(file);
@@ -118,13 +149,14 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || assigneeIds.length === 0 || !projectId) return;
+    if (!title.trim() || assigneeIds.length === 0 || !projectId || !featureId) return;
     setSubmitError('');
     setSubmitting(true);
     try {
       setActiveProjectId(projectId);
       await createTicket({
         projectId,
+        featureId: featureId || null,
         title: title.trim(),
         description,
         department,
@@ -143,6 +175,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setPriority('medium');
       setAssigneeIds([]);
       setStatus('todo');
+      setFeatureId('');
       setDueDate('');
       setAttachments([]);
       setAttachError('');
@@ -152,6 +185,23 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setSubmitError(err?.response?.data?.message || 'Failed to create ticket');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCreateFeature = async () => {
+    if (!projectId || !newFeatureName.trim()) return;
+    setCreatingFeature(true);
+    setFeatureError('');
+    try {
+      const created = await featureApi.createFeature(projectId, newFeatureName.trim());
+      const next = await featureApi.getFeatures(projectId);
+      setFeatures(next);
+      setFeatureId(created.id);
+      setNewFeatureName('');
+    } catch (err: any) {
+      setFeatureError(err?.response?.data?.message || 'Failed to create feature');
+    } finally {
+      setCreatingFeature(false);
     }
   };
 
@@ -182,6 +232,38 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
                 <option value="" disabled>Select project</option>
                 {projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
+            </div>
+            <div>
+              <label className={labelCls}>Feature</label>
+              {features.length > 0 ? (
+                <select value={featureId} onChange={e => setFeatureId(e.target.value)} className={selectCls} required>
+                  {features.map(feature => <option key={feature.id} value={feature.id}>{feature.name}</option>)}
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    value={newFeatureName}
+                    onChange={(e) => setNewFeatureName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return;
+                      e.preventDefault();
+                      handleCreateFeature();
+                    }}
+                    className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Create first feature name"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateFeature}
+                    disabled={creatingFeature || !newFeatureName.trim()}
+                    className="h-9 px-3 rounded-md border text-sm font-medium hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {creatingFeature ? 'Creating...' : 'Create Feature'}
+                  </button>
+                  {featureError && <p className="text-xs text-destructive">{featureError}</p>}
+                  <p className="text-[10px] text-muted-foreground">This project has no features yet. Add one to continue.</p>
+                </div>
+              )}
             </div>
             <div>
               <label className={labelCls}>Department</label>
@@ -256,7 +338,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             >
               <CloudUpload className="h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Drag & drop images here, or click to browse</span>
-              <span className="text-[10px] text-muted-foreground">Supports: JPG, JPEG, PNG, GIF, WEBP — Max 5MB per file</span>
+              <span className="text-[10px] text-muted-foreground">Supports: JPG, JPEG, PNG, GIF, WEBP — Max 500KB per file</span>
             </div>
             <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
             {attachError && <p className="text-xs text-destructive mt-1">{attachError}</p>}
@@ -276,7 +358,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
-            <button type="submit" disabled={submitting || availableUsers.length === 0 || assigneeIds.length === 0 || !projectId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
+            <button type="submit" disabled={submitting || availableUsers.length === 0 || assigneeIds.length === 0 || !projectId || !featureId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
           </div>
           {submitError && <p className="text-xs text-destructive">{submitError}</p>}
         </form>

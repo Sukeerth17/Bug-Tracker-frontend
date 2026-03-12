@@ -1,6 +1,6 @@
 export type TicketStatus = 'todo' | 'in-progress' | 'in-review' | 'done';
 export type TicketPriority = 'low' | 'medium' | 'high' | 'critical';
-export type TicketType = 'bug' | 'task' | 'story' | 'improvement';
+export type TicketType = 'bug' | 'task' | 'improvement';
 export type Department = 'Website' | 'Mobile' | 'Backend' | 'DevOps';
 
 export interface User {
@@ -32,6 +32,9 @@ export interface ActivityEvent {
 
 export interface Ticket {
   id: string;
+  projectId: string;
+  featureId?: string | null;
+  featureName?: string | null;
   title: string;
   description: string;
   status: TicketStatus;
@@ -48,6 +51,14 @@ export interface Ticket {
   attachments: string[];
   comments: Comment[];
   activity: ActivityEvent[];
+}
+
+export interface Feature {
+  id: string;
+  projectId: string;
+  name: string;
+  createdAt: string;
+  createdByUserId: number;
 }
 
 export const statusLabels: Record<TicketStatus, string> = {
@@ -67,7 +78,6 @@ export const priorityLabels: Record<TicketPriority, string> = {
 export const typeLabels: Record<TicketType, string> = {
   bug: 'Bug',
   task: 'Task',
-  story: 'Story',
   improvement: 'Improvement',
 };
 

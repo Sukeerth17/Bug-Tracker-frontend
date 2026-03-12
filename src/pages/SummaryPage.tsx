@@ -4,7 +4,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, UserAvatar, DeptBadge } from '@/components/TicketBadges';
 import { statusLabels, departments } from '@/data/models';
-import type { Department, TicketStatus, Ticket } from '@/data/models';
+import type { ActivityEvent, Department, TicketStatus, Ticket } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dashboardApi, DashboardSummary } from '@/services/dashboardApi';
@@ -22,9 +22,11 @@ const statusColors: Record<TicketStatus, string> = {
 type SortKey = 'department' | 'status' | 'assignee';
 
 const SummaryPage = () => {
-  const { tickets, allActivity, setSelectedTicket } = useTickets();
+  const { setSelectedTicket } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [activityTickets, setActivityTickets] = useState<Record<string, Ticket>>({});
 
   const [deptFilter, setDeptFilter] = useState<Department | 'All'>('All');
   const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
@@ -47,6 +49,37 @@ const SummaryPage = () => {
       .catch(() => setDashboard(null));
   }, [projectId, deptFilter]);
 
+  useEffect(() => {
+    if (!projectId) {
+      setActivity([]);
+      setActivityTickets({});
+      return;
+    }
+    ticketApi.getActivity(projectId)
+      .then(setActivity)
+      .catch(() => setActivity([]));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || activity.length === 0) {
+      setActivityTickets({});
+      return;
+    }
+    const ids = Array.from(new Set(activity.map((event) => event.ticketId).filter(Boolean))) as string[];
+    if (ids.length === 0) {
+      setActivityTickets({});
+      return;
+    }
+    Promise.all(ids.map((id) => ticketApi.getTicketById(projectId, id).catch(() => null)))
+      .then((rows) => {
+        const next: Record<string, Ticket> = {};
+        rows.forEach((ticket) => {
+          if (ticket) next[ticket.id] = ticket;
+        });
+        setActivityTickets(next);
+      })
+      .catch(() => setActivityTickets({}));
+  }, [activity, projectId]);
 
   useEffect(() => {
     if (!projectId) {
@@ -91,7 +124,7 @@ const SummaryPage = () => {
   ]), [statusCounts]);
 
   const totalTickets = statusCounts.total;
-  const recentActivity = allActivity.slice(0, 15);
+  const recentActivity = activity.slice(0, 15);
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return '↕';
@@ -201,14 +234,31 @@ const SummaryPage = () => {
                     <span className="text-muted-foreground">{event.action}</span>
                     {event.ticketId && (
                       <button
-                        onClick={() => {
-                          const t = tickets.find((tk) => tk.id === event.ticketId);
-                          if (t) setSelectedTicket(t);
+                        onClick={async () => {
+                          if (!projectId) return;
+                          try {
+                            const t = await ticketApi.getTicketById(projectId, event.ticketId);
+                            setSelectedTicket(t);
+                          } catch {
+                            // ignore
+                          }
                         }}
                         className="ml-1 font-mono text-xs text-primary hover:underline"
                       >
                         {event.ticketId}
                       </button>
+                    )}
+                    {event.ticketId && activityTickets[event.ticketId] && (
+                      <span className="ml-2 inline-flex items-center gap-1.5">
+                        <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                          {activityTickets[event.ticketId].projectId}
+                        </span>
+                        {activityTickets[event.ticketId].featureName && (
+                          <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {activityTickets[event.ticketId].featureName}
+                          </span>
+                        )}
+                      </span>
                     )}
                   </p>
                   {event.oldValue && event.newValue && (

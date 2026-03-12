@@ -80,7 +80,15 @@ const AdminUsersPage = () => {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <h1 className="text-xl font-semibold">User Management</h1>
 
-      <form onSubmit={handleAdd} className="bg-card rounded-xl border p-4 space-y-3">
+      <form
+        onSubmit={handleAdd}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          handleAdd(e as unknown as React.FormEvent);
+        }}
+        className="bg-card rounded-xl border p-4 space-y-3"
+      >
         <div className="grid md:grid-cols-3 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Full name" required />
           <input value={email} onChange={(e) => setEmail(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="email" placeholder="Gmail address" required />

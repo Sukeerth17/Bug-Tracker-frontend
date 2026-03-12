@@ -6,7 +6,6 @@ export interface ProjectItem {
   name: string;
   description?: string | null;
   startDate?: string | null;
-  metadataJson?: string | null;
   createdByUserId: number;
   createdAt: string;
 }
@@ -17,7 +16,7 @@ export const projectApi = {
     return response.data;
   },
 
-  async createProject(payload: { name: string; description?: string; startDate?: string; metadataJson?: string }) {
+  async createProject(payload: { name: string; description?: string; startDate?: string }) {
     const response = await api.post<ProjectItem>(API_ENDPOINTS.projects, payload);
     return response.data;
   },

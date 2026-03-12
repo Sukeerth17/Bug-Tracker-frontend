@@ -31,6 +31,9 @@ interface ApiActivity {
 
 interface ApiTicket {
   id: string;
+  projectId: string;
+  featureId?: number | null;
+  featureName?: string | null;
   title: string;
   description: string;
   status: Ticket['status'];
@@ -62,6 +65,7 @@ export interface TicketQueryParams {
   status?: Ticket['status'];
   priority?: Ticket['priority'];
   assigneeId?: number;
+  featureId?: string | number;
   createdFrom?: string;
   createdTo?: string;
   updatedFrom?: string;
@@ -121,6 +125,9 @@ function mapTicket(ticket: ApiTicket): Ticket {
 
   return {
     id: ticket.id,
+    projectId: ticket.projectId,
+    featureId: ticket.featureId == null ? null : String(ticket.featureId),
+    featureName: ticket.featureName ?? null,
     title: ticket.title,
     description: ticket.description || '',
     status: ticket.status,
@@ -169,9 +176,9 @@ export const ticketApi = {
     return response.data.map((user) => mapUser(user) as User);
   },
 
-  async getTickets(projectId: string): Promise<Ticket[]> {
+  async getTickets(projectId: string, featureId?: string | number | null): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[] | ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, {
-      params: { projectId, page: 0, size: 500 },
+      params: { projectId, featureId: featureId ?? undefined, page: 0, size: 500 },
     });
     const rows = Array.isArray(response.data) ? response.data : response.data.items || [];
     return rows.map(mapTicket);
@@ -200,13 +207,13 @@ export const ticketApi = {
     return response.data.map(mapTicket);
   },
 
-  async getRecent(projectId: string): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/recent`, { params: { projectId } });
+  async getRecent(params: { projectId?: string; featureId?: string | number; department?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/recent`, { params });
     return response.data.map(mapTicket);
   },
 
-  async getForYou(projectId: string): Promise<Ticket[]> {
-    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/for-you`, { params: { projectId } });
+  async getForYou(params: { projectId?: string; featureId?: string | number; department?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+    const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/for-you`, { params });
     return response.data.map(mapTicket);
   },
 
@@ -224,6 +231,7 @@ export const ticketApi = {
 
   async createTicket(payload: {
     projectId: string;
+    featureId?: string | number | null;
     title: string;
     description: string;
     status: Ticket['status'];

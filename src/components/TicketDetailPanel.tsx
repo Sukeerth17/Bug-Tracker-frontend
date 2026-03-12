@@ -1,15 +1,20 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { X, MessageSquare, Activity, FileText } from 'lucide-react';
 import { statusLabels } from '@/data/models';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, GhostAvatar } from './TicketBadges';
 import { useTickets } from '@/contexts/TicketContext';
-import type { TicketStatus } from '@/data/models';
+import type { TicketStatus, User } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import { useLocation } from 'react-router-dom';
+import { resolveProjectId } from '@/services/projectControl';
+import { ticketApi } from '@/services/ticketApi';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment, users } = useTickets();
+  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment } = useTickets();
+  const location = useLocation();
+  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [previewAttachment, setPreviewAttachment] = useState<string | null>(null);
   const [statusDraft, setStatusDraft] = useState<TicketStatus>('todo');
@@ -18,6 +23,10 @@ const TicketDetailPanel = () => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const assigneeRef = useRef<HTMLDivElement>(null);
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
 
   const ticket = selectedTicket;
 
@@ -26,6 +35,29 @@ const TicketDetailPanel = () => {
     setStatusDraft(ticket.status);
     setAssigneeIdsDraft(ticket.assignees.map((assignee) => assignee.id));
   }, [ticket?.id, ticket?.status, ticket?.assignees]);
+  useEffect(() => {
+    setAssigneeOpen(false);
+  }, [ticket?.id]);
+
+  useEffect(() => {
+    if (!ticket || !projectId) {
+      setAvailableUsers([]);
+      return;
+    }
+    ticketApi.getUsers(projectId, true)
+      .then(setAvailableUsers)
+      .catch(() => setAvailableUsers([]));
+  }, [ticket?.id, projectId]);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!assigneeRef.current) return;
+      if (!assigneeOpen) return;
+      if (assigneeRef.current.contains(e.target as Node)) return;
+      setAssigneeOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [assigneeOpen]);
 
   const hasChanges = useMemo(() => {
     if (!ticket) return false;
@@ -36,6 +68,58 @@ const TicketDetailPanel = () => {
       || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
     return statusChanged || assigneesChanged;
   }, [ticket, statusDraft, assigneeIdsDraft]);
+
+  const draftAssignees = useMemo(() => {
+    if (assigneeIdsDraft.length === 0) return [];
+    return availableUsers.filter((user) => assigneeIdsDraft.includes(user.id));
+  }, [availableUsers, assigneeIdsDraft]);
+  const displayedAssignees = useMemo(() => {
+    if (draftAssignees.length > 0) return draftAssignees;
+    return ticket?.assignees || [];
+  }, [draftAssignees, ticket?.assignees]);
+
+  const handleSave = async () => {
+    if (!ticket || !hasChanges || !projectId) return;
+    setSaving(true);
+    try {
+      if (statusDraft !== ticket.status) {
+        await updateTicketStatus(projectId, ticket.id, statusDraft);
+      }
+      const currentAssignees = ticket.assignees.map((a) => a.id).sort();
+      const draftAssignees = [...assigneeIdsDraft].sort();
+      const assigneesChanged = currentAssignees.length !== draftAssignees.length
+        || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
+      if (assigneesChanged) {
+        await updateTicketAssignees(projectId, ticket.id, assigneeIdsDraft);
+        setSelectedTicket((prev) => {
+          if (!prev || prev.id !== ticket.id) return prev;
+          const nextAssignees = draftAssignees;
+          return {
+            ...prev,
+            assignees: nextAssignees,
+            assignee: nextAssignees[0] || null,
+          };
+        });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!ticket) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      if (!hasChanges) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (panelRef.current && !panelRef.current.contains(target)) return;
+      e.preventDefault();
+      void handleSave();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [ticket, hasChanges]);
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -57,25 +141,6 @@ const TicketDetailPanel = () => {
     setCloseConfirmOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!ticket || !hasChanges) return;
-    setSaving(true);
-    try {
-      if (statusDraft !== ticket.status) {
-        await updateTicketStatus(ticket.id, statusDraft);
-      }
-      const currentAssignees = ticket.assignees.map((a) => a.id).sort();
-      const draftAssignees = [...assigneeIdsDraft].sort();
-      const assigneesChanged = currentAssignees.length !== draftAssignees.length
-        || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
-      if (assigneesChanged) {
-        await updateTicketAssignees(ticket.id, assigneeIdsDraft);
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleCancel = () => {
     if (!ticket) return;
     setStatusDraft(ticket.status);
@@ -91,7 +156,7 @@ const TicketDetailPanel = () => {
   return (
     <>
       <div className="fixed inset-0 z-40 bg-foreground/20" onClick={confirmClose} />
-      <div className="fixed right-0 top-0 h-screen w-full max-w-[600px] bg-card border-l shadow-2xl z-50 flex flex-col animate-slide-in-right">
+      <div ref={panelRef} className="fixed right-0 top-0 h-screen w-full max-w-[600px] bg-card border-l shadow-2xl z-50 flex flex-col animate-slide-in-right">
         <div className="flex items-center justify-between p-4 border-b shrink-0">
           <div className="flex items-center gap-2">
             <TypeIcon type={ticket.type} />
@@ -102,6 +167,16 @@ const TicketDetailPanel = () => {
 
         <div className="px-4 pt-4 pb-2 shrink-0">
           <h2 className="text-lg font-semibold leading-tight">{ticket.title}</h2>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="inline-flex items-center rounded-full border bg-primary/10 text-primary px-3 py-1 text-xs font-semibold shadow-sm">
+              Project: {ticket.projectId}
+            </span>
+            {ticket.featureName && (
+              <span className="inline-flex items-center rounded-full border bg-primary/10 text-primary px-3 py-1 text-xs font-semibold shadow-sm">
+                Feature: {ticket.featureName}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="px-4 pb-3 flex items-center gap-2 shrink-0">
@@ -162,7 +237,7 @@ const TicketDetailPanel = () => {
                   <label className="text-xs font-medium text-muted-foreground">Assignees</label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     {ticket.assignees.length > 0 ? (
-                      ticket.assignees.map((assignee) => (
+                      displayedAssignees.map((assignee) => (
                         <span key={assignee.id} className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1">
                           <UserAvatar name={assignee.name} avatar={assignee.avatar} />
                           <span className="text-xs">{assignee.name}</span>
@@ -173,17 +248,39 @@ const TicketDetailPanel = () => {
                     )}
                   </div>
                   <div className="mt-2">
-                    <select
-                      value={assigneeIdsDraft}
-                      onChange={(e) => setAssigneeIdsDraft(Array.from(e.target.selectedOptions, (option) => option.value))}
-                      className="w-full min-h-24 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                      multiple
-                    >
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>{user.name}</option>
-                      ))}
-                    </select>
-                    <p className="text-[10px] text-muted-foreground mt-1">Hold Ctrl/Cmd to select multiple users.</p>
+                    <div ref={assigneeRef} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setAssigneeOpen((prev) => !prev)}
+                        className="w-full h-9 rounded-md border bg-background px-3 text-sm text-left flex items-center justify-between"
+                      >
+                        <span>{assigneeIdsDraft.length > 0 ? `${assigneeIdsDraft.length} selected` : 'Select assignees'}</span>
+                        <span className="text-xs text-muted-foreground">{assigneeOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {assigneeOpen && (
+                        <div className="absolute z-20 mt-1 w-full max-h-56 overflow-auto rounded-md border bg-card shadow-lg p-2">
+                          {availableUsers.map((user) => {
+                            const checked = assigneeIdsDraft.includes(user.id);
+                            return (
+                              <label key={user.id} className="flex items-center gap-2 py-1 text-sm cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => {
+                                    setAssigneeIdsDraft((prev) => {
+                                      if (prev.includes(user.id)) return prev.filter((id) => id !== user.id);
+                                      return [...prev, user.id];
+                                    });
+                                  }}
+                                />
+                                <span>{user.name}</span>
+                              </label>
+                            );
+                          })}
+                          {availableUsers.length === 0 && <p className="text-xs text-muted-foreground px-1 py-2">No assignable users.</p>}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -266,10 +363,10 @@ const TicketDetailPanel = () => {
                     className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs disabled:opacity-60"
                     disabled={submittingComment || !commentText.trim()}
                     onClick={async () => {
-                      if (!commentText.trim()) return;
+                      if (!commentText.trim() || !projectId) return;
                       setSubmittingComment(true);
                       try {
-                        await addTicketComment(ticket.id, commentText);
+                        await addTicketComment(projectId, ticket.id, commentText);
                         setCommentText('');
                       } finally {
                         setSubmittingComment(false);

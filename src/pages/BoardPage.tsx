@@ -1,13 +1,16 @@
-import React from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams, NavLink, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTickets } from '@/contexts/TicketContext';
 import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
-import type { TicketStatus } from '@/data/models';
+import type { Ticket, TicketStatus } from '@/data/models';
 import { statusLabels } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle2, Paperclip } from 'lucide-react';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { toast } from '@/components/ui/sonner';
+import { resolveProjectId } from '@/services/projectControl';
+import { ticketApi } from '@/services/ticketApi';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
@@ -17,7 +20,13 @@ const columns: { id: TicketStatus; label: string; color: string }[] = [
 ];
 
 const BoardPage = () => {
-  const { tickets, setSelectedTicket, updateTicketStatus } = useTickets();
+  const { spaceId, featureId } = useParams();
+  const location = useLocation();
+  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const { setSelectedTicket, updateTicketStatus } = useTickets();
+  const isFeatureView = Boolean(featureId);
+  const [boardTickets, setBoardTickets] = useState<Ticket[]>([]);
+  const [loading, setLoading] = useState(false);
   const [pendingMove, setPendingMove] = React.useState<{
     ticketId: string;
     title: string;
@@ -27,15 +36,47 @@ const BoardPage = () => {
 
   const grouped = columns.map(col => ({
     ...col,
-    tickets: tickets.filter(t => t.status === col.id),
+    tickets: boardTickets.filter(t => t.status === col.id),
   }));
+
+  const loadBoard = useCallback(async () => {
+    if (!projectId) {
+      setBoardTickets([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await ticketApi.queryTickets(projectId, {
+        featureId: featureId || undefined,
+        sortBy: 'updatedAt',
+        sortDir: 'desc',
+        page: 0,
+        size: 500,
+      });
+      setBoardTickets(response.items);
+    } catch {
+      setBoardTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, featureId]);
+
+  useEffect(() => {
+    loadBoard();
+  }, [loadBoard]);
+
+  useEffect(() => {
+    const handler = () => loadBoard();
+    window.addEventListener('ticket:created', handler as EventListener);
+    return () => window.removeEventListener('ticket:created', handler as EventListener);
+  }, [loadBoard]);
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
     const fromStatus = result.source.droppableId as TicketStatus;
     const toStatus = result.destination.droppableId as TicketStatus;
     if (fromStatus === toStatus) return;
-    const ticket = tickets.find(t => t.id === result.draggableId);
+    const ticket = boardTickets.find(t => t.id === result.draggableId);
     if (!ticket) return;
     setPendingMove({
       ticketId: ticket.id,
@@ -47,7 +88,34 @@ const BoardPage = () => {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-xl font-semibold">Board</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {spaceId && (
+            <div className="inline-flex items-center rounded-lg border bg-muted/40 p-1 text-xs">
+              <NavLink
+                to={featureId ? `/space/${spaceId}/feature/${featureId}/board` : `/space/${spaceId}/board`}
+                className={({ isActive }) => cn(
+                  'px-3 py-1 rounded-md transition-colors',
+                  isActive ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Board
+              </NavLink>
+              <NavLink
+                to={featureId ? `/space/${spaceId}/feature/${featureId}/list` : `/space/${spaceId}/list`}
+                className={({ isActive }) => cn(
+                  'px-3 py-1 rounded-md transition-colors',
+                  isActive ? 'bg-card text-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                List
+              </NavLink>
+            </div>
+          )}
+          <h1 className="text-xl font-semibold">Board</h1>
+        </div>
+      </div>
+      {loading && <div className="text-xs text-muted-foreground">Loading board...</div>}
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex gap-4 overflow-x-auto pb-4">
           {grouped.map(col => (
@@ -83,7 +151,15 @@ const BoardPage = () => {
                             )}
                           >
                             <p className="text-sm font-medium leading-snug mb-2">{ticket.title}</p>
-                            <div className="flex items-center gap-1.5 mb-2">
+                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                              <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                {ticket.projectId}
+                              </span>
+                              {ticket.featureName && (
+                                <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  {ticket.featureName}
+                                </span>
+                              )}
                               <DeptBadge department={ticket.department} />
                               <PriorityIcon priority={ticket.priority} />
                             </div>
@@ -142,7 +218,10 @@ const BoardPage = () => {
           if (!pendingMove) return;
           const { ticketId, toStatus } = pendingMove;
           setPendingMove(null);
-          await updateTicketStatus(ticketId, toStatus);
+          if (projectId) {
+            await updateTicketStatus(projectId, ticketId, toStatus);
+          }
+          await loadBoard();
           toast(`Ticket moved to ${statusLabels[toStatus]}`);
         }}
         onCancel={() => setPendingMove(null)}

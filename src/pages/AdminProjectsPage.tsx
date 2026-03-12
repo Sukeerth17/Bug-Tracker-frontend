@@ -9,7 +9,6 @@ const AdminProjectsPage = () => {
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [startDate, setStartDate] = React.useState('');
-  const [metadataJson, setMetadataJson] = React.useState('');
   const [error, setError] = React.useState('');
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
@@ -37,12 +36,10 @@ const AdminProjectsPage = () => {
         name: name.trim(),
         description: description.trim() || undefined,
         startDate: startDate || undefined,
-        metadataJson: metadataJson.trim() || undefined,
       });
       setName('');
       setDescription('');
       setStartDate('');
-      setMetadataJson('');
       await load();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to create project');
@@ -75,12 +72,19 @@ const AdminProjectsPage = () => {
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <h1 className="text-xl font-semibold">Create Project</h1>
-      <form onSubmit={handleCreate} className="bg-card rounded-xl border p-4 space-y-3">
+      <form
+        onSubmit={handleCreate}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          handleCreate(e as unknown as React.FormEvent);
+        }}
+        className="bg-card rounded-xl border p-4 space-y-3"
+      >
         <div className="grid md:grid-cols-2 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Project name *" required />
           <input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="date" />
           <input value={description} onChange={(e) => setDescription(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2" placeholder="Description" />
-          <textarea value={metadataJson} onChange={(e) => setMetadataJson(e.target.value)} className="min-h-20 rounded-md border bg-background px-3 py-2 text-sm md:col-span-2" placeholder="Metadata JSON (optional)" />
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
         <button disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium">{saving ? 'Saving...' : 'Create Project'}</button>

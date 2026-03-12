@@ -1,10 +1,10 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { API_ENDPOINTS, getApiBaseUrl, getRequesterUserId, setApiBaseUrl, setRequesterUserId } from '@/services/controlApi';
-import { useTickets } from '@/contexts/TicketContext';
 import { ticketApi } from '@/services/ticketApi';
+import type { User } from '@/data/models';
 
 const ControlApiPage = () => {
-  const { users, refreshAll } = useTickets();
+  const [users, setUsers] = useState<User[]>([]);
   const [baseUrl, setBaseUrlLocal] = useState(getApiBaseUrl());
   const [requesterUserId, setRequesterUserIdLocal] = useState(getRequesterUserId());
   const [saving, setSaving] = useState(false);
@@ -18,12 +18,17 @@ const ControlApiPage = () => {
     []
   );
 
+  useEffect(() => {
+    ticketApi.getUsers()
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     try {
       setApiBaseUrl(baseUrl);
       setRequesterUserId(requesterUserId);
-      await refreshAll();
     } finally {
       setSaving(false);
     }
@@ -44,7 +49,7 @@ const ControlApiPage = () => {
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserAvatar('');
-      await refreshAll();
+      setUsers((prev) => [created.user, ...prev]);
     } finally {
       setSaving(false);
     }
@@ -54,7 +59,14 @@ const ControlApiPage = () => {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       <h1 className="text-xl font-semibold">Control API</h1>
 
-      <div className="bg-card rounded-xl border p-4 space-y-4">
+      <div
+        className="bg-card rounded-xl border p-4 space-y-4"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          void handleSave();
+        }}
+      >
         <div>
           <label className="text-xs font-medium text-muted-foreground">Backend Base URL</label>
           <input

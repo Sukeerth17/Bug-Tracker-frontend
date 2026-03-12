@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
+import type { Ticket } from '@/data/models';
 import { useAuth } from '@/contexts/AuthContext';
 import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { notificationApi, NotificationItem } from '@/services/notificationApi';
 import { ticketApi } from '@/services/ticketApi';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -18,16 +20,17 @@ interface TopHeaderProps {
 const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeaderProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tickets, setSelectedTicket, currentUser } = useTickets();
+  const { setSelectedTicket, currentUser } = useTickets();
   const { logout } = useAuth();
   const parts = location.pathname.split('/');
   const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : 'sp1';
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [searchResults, setSearchResults] = useState<typeof tickets>([]);
+  const [searchResults, setSearchResults] = useState<Ticket[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -229,10 +232,14 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                       onClick={async () => {
                         await markNotificationRead(notification.id);
                         if (notification.ticketId) {
-                          const ticket = tickets.find((item) => item.id === notification.ticketId);
-                          if (ticket) {
+                          try {
+                            if (!currentProjectId) {
+                              navigate('/for-you');
+                              return;
+                            }
+                            const ticket = await ticketApi.getTicketById(currentProjectId, notification.ticketId);
                             setSelectedTicket(ticket);
-                          } else {
+                          } catch {
                             navigate('/for-you');
                           }
                         }
@@ -275,7 +282,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                 <p className="text-xs text-muted-foreground">{currentUser.email}</p>
               </div>
               <button
-                onClick={() => { setUserMenuOpen(false); logout(); navigate('/login'); }}
+                onClick={() => { setUserMenuOpen(false); setLogoutConfirmOpen(true); }}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="h-4 w-4" />
@@ -285,6 +292,20 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
           )}
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={logoutConfirmOpen}
+        title="Confirm Logout"
+        message="Are you sure you want to log out?"
+        confirmLabel="Yes, Logout"
+        cancelLabel="Cancel"
+        variant="warning"
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          logout();
+          navigate('/login');
+        }}
+        onCancel={() => setLogoutConfirmOpen(false)}
+      />
     </header>
   );
 };

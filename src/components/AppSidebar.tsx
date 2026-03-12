@@ -2,11 +2,12 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   User, Clock,
-  LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users,
+  LayoutDashboard, List, Kanban, ChevronDown, ChevronRight, FolderPlus, Users, Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getProjectIdFromPathname, setActiveProjectId } from '@/services/projectControl';
 import { projectApi, ProjectItem } from '@/services/projectApi';
+import { featureApi, FeatureItem } from '@/services/featureApi';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface AppSidebarProps {
@@ -20,6 +21,11 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const { user } = useAuth();
   const [projects, setProjects] = React.useState<ProjectItem[]>([]);
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
+  const [featuresByProject, setFeaturesByProject] = React.useState<Record<string, FeatureItem[]>>({});
+  const [expandedFeatureSections, setExpandedFeatureSections] = React.useState<Set<string>>(new Set());
+  const [expandedFeatures, setExpandedFeatures] = React.useState<Set<string>>(new Set());
+  const [creatingForProject, setCreatingForProject] = React.useState<string | null>(null);
+  const [newFeatureName, setNewFeatureName] = React.useState('');
 
   const parts = location.pathname.split('/');
   const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || '');
@@ -27,6 +33,23 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   React.useEffect(() => {
     projectApi.getProjects().then(setProjects).catch(() => setProjects([]));
   }, [location.pathname]);
+
+  React.useEffect(() => {
+    if (projects.length === 0) {
+      setFeaturesByProject({});
+      return;
+    }
+    Promise.all(
+      projects.map(async (project) => ({
+        projectId: project.id,
+        features: await featureApi.getFeatures(project.id).catch(() => []),
+      }))
+    ).then((rows) => {
+      const next: Record<string, FeatureItem[]> = {};
+      rows.forEach((row) => { next[row.projectId] = row.features; });
+      setFeaturesByProject(next);
+    });
+  }, [projects]);
 
   React.useEffect(() => {
     const projectId = getProjectIdFromPathname(location.pathname);
@@ -59,6 +82,41 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       }
       return next;
     });
+  };
+
+  const toggleFeatureSection = (projectId: string) => {
+    setExpandedFeatureSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const toggleFeatureExpanded = (featureId: string) => {
+    setExpandedFeatures((prev) => {
+      const next = new Set(prev);
+      if (next.has(featureId)) next.delete(featureId);
+      else next.add(featureId);
+      return next;
+    });
+  };
+
+  const createFeature = async (projectId: string) => {
+    const name = newFeatureName.trim();
+    if (!name) {
+      setNewFeatureName('');
+      setCreatingForProject(null);
+      return;
+    }
+    const created = await featureApi.createFeature(projectId, name);
+    setFeaturesByProject((prev) => ({
+      ...prev,
+      [projectId]: [created, ...(prev[projectId] || [])],
+    }));
+    setNewFeatureName('');
+    setCreatingForProject(null);
+    setExpandedFeatureSections((prev) => new Set(prev).add(projectId));
   };
 
   return (
@@ -168,6 +226,109 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                           <List className="h-3.5 w-3.5 shrink-0" />
                           <span>List</span>
                         </NavLink>
+
+                        <div className="mt-2">
+                          <div className="flex items-center justify-between px-2 py-1 text-xs font-semibold uppercase tracking-widest text-sidebar-muted">
+                            <button
+                              onClick={() => toggleFeatureSection(project.id)}
+                              className="flex items-center gap-1 hover:text-sidebar-foreground"
+                            >
+                              {expandedFeatureSections.has(project.id) ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
+                              Features
+                            </button>
+                            <button
+                              onClick={() => {
+                                setCreatingForProject(project.id);
+                                setExpandedFeatureSections((prev) => new Set(prev).add(project.id));
+                              }}
+                              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-sidebar-accent"
+                              aria-label="Add feature"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          {expandedFeatureSections.has(project.id) && (
+                            <div className="ml-2 space-y-1">
+                              {creatingForProject === project.id && (
+                                <div className="flex items-center gap-1 px-2">
+                                  <input
+                                    value={newFeatureName}
+                                    onChange={(e) => setNewFeatureName(e.target.value)}
+                                    onBlur={() => {
+                                      if (!newFeatureName.trim()) {
+                                        setCreatingForProject(null);
+                                        setNewFeatureName('');
+                                      }
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        void createFeature(project.id);
+                                      }
+                                      if (e.key === 'Escape') {
+                                        setCreatingForProject(null);
+                                        setNewFeatureName('');
+                                      }
+                                    }}
+                                    className="h-7 flex-1 rounded-md border bg-background px-2 text-xs text-black placeholder:text-muted-foreground"
+                                    placeholder="New feature name"
+                                  />
+                                </div>
+                              )}
+                              {(featuresByProject[project.id] || []).map((feature) => (
+                                <div key={feature.id} className="space-y-1">
+                                  <div className="flex items-center gap-1 px-2">
+                                    <button
+                                      onClick={() => toggleFeatureExpanded(feature.id)}
+                                      className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-sidebar-accent"
+                                      aria-label="Toggle feature"
+                                    >
+                                      {expandedFeatures.has(feature.id) ? (
+                                        <ChevronDown className="h-3.5 w-3.5" />
+                                      ) : (
+                                        <ChevronRight className="h-3.5 w-3.5" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => navigate(`/space/${project.id}/feature/${feature.id}/board`)}
+                                      className="flex-1 text-left text-sm text-sidebar-muted hover:text-sidebar-foreground"
+                                    >
+                                      {feature.name}
+                                    </button>
+                                  </div>
+                                  {expandedFeatures.has(feature.id) && (
+                                    <div className="ml-6 space-y-0.5">
+                                      <NavLink
+                                        to={`/space/${project.id}/feature/${feature.id}/board`}
+                                        className={({ isActive }) => cn(
+                                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                                          isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                                        )}
+                                      >
+                                        <Kanban className="h-3.5 w-3.5 shrink-0" />
+                                        <span>Board</span>
+                                      </NavLink>
+                                      <NavLink
+                                        to={`/space/${project.id}/feature/${feature.id}/list`}
+                                        className={({ isActive }) => cn(
+                                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',
+                                          isActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                                        )}
+                                      >
+                                        <List className="h-3.5 w-3.5 shrink-0" />
+                                        <span>List</span>
+                                      </NavLink>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
