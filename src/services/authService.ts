@@ -1,6 +1,6 @@
 ﻿import api from '@/services/api';
 import { setRequesterUserId } from '@/services/controlApi';
-import { clearAuthStorage, setAuthToken, setAuthUser } from '@/services/authStorage';
+import { clearAuthStorage, setAuthToken, setAuthUser, setRememberMe } from '@/services/authStorage';
 import { User } from '@/data/models';
 
 interface AuthResponse {
@@ -24,10 +24,11 @@ function mapUser(user: AuthResponse['user']): User {
   };
 }
 
-function persistAuth(response: AuthResponse): User {
+function persistAuth(response: AuthResponse, remember: boolean): User {
   const user = mapUser(response.user);
-  setAuthToken(response.token);
-  setAuthUser(user);
+  setRememberMe(remember);
+  setAuthToken(response.token, remember);
+  setAuthUser(user, remember);
   setRequesterUserId(user.id);
   return user;
 }
@@ -38,9 +39,9 @@ export const authService = {
     return response.data.message;
   },
 
-  async login(payload: { email: string; password: string }) {
+  async login(payload: { email: string; password: string; remember: boolean }) {
     const response = await api.post<AuthResponse>('/auth/login', payload);
-    return persistAuth(response.data);
+    return persistAuth(response.data, payload.remember);
   },
 
   async forgotPassword(email: string) {

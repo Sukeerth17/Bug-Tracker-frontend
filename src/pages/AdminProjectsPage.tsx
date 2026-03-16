@@ -1,6 +1,7 @@
 import React from 'react';
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import { toast } from '@/components/ui/sonner';
 
 const AdminProjectsPage = () => {
   const [projects, setProjects] = React.useState<ProjectItem[]>([]);
@@ -41,6 +42,7 @@ const AdminProjectsPage = () => {
       setDescription('');
       setStartDate('');
       await load();
+      toast('Project saved');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to create project');
     } finally {
@@ -60,6 +62,7 @@ const AdminProjectsPage = () => {
     try {
       await projectApi.deleteProject(pendingDeleteId);
       await load();
+      toast('Project deleted');
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to delete project');
     } finally {

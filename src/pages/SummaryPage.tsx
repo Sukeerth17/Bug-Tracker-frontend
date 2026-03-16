@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { CheckCircle2, ListChecks } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
@@ -36,7 +36,7 @@ const SummaryPage = () => {
   const [sortKey, setSortKey] = useState<SortKey>('department');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  useEffect(() => {
+  const fetchDashboard = useCallback(() => {
     if (!projectId) {
       setDashboard(null);
       return;
@@ -49,7 +49,7 @@ const SummaryPage = () => {
       .catch(() => setDashboard(null));
   }, [projectId, deptFilter]);
 
-  useEffect(() => {
+  const fetchActivity = useCallback(() => {
     if (!projectId) {
       setActivity([]);
       setActivityTickets({});
@@ -81,7 +81,7 @@ const SummaryPage = () => {
       .catch(() => setActivityTickets({}));
   }, [activity, projectId]);
 
-  useEffect(() => {
+  const fetchSummary = useCallback(() => {
     if (!projectId) {
       setSummaryRows([]);
       return;
@@ -96,15 +96,59 @@ const SummaryPage = () => {
       .catch(() => setSummaryRows([]));
   }, [projectId, listDeptFilter, listStatusFilter, sortKey, sortDir]);
 
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  useEffect(() => {
+    fetchActivity();
+  }, [fetchActivity]);
+
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  useEffect(() => {
+    const handler = () => {
+      fetchActivity();
+      fetchDashboard();
+      fetchSummary();
+    };
+    window.addEventListener('ticket:updated', handler);
+    window.addEventListener('ticket:created', handler);
+    return () => {
+      window.removeEventListener('ticket:updated', handler);
+      window.removeEventListener('ticket:created', handler);
+    };
+  }, [fetchActivity, fetchDashboard, fetchSummary]);
+
   const statusCounts = useMemo(() => {
-    const byStatus = dashboard?.byStatus || {};
-    const todo = Number(byStatus['todo'] || 0);
-    const inProgress = Number(byStatus['in-progress'] || 0);
-    const inReview = Number(byStatus['in-review'] || 0);
-    const done = Number(byStatus['done'] || 0);
-    const total = Number(dashboard?.totalTickets ?? 0);
-    return { todo, inProgress, inReview, done, total };
-  }, [dashboard]);
+    const fromSummaryRows = () => {
+      const fallback = { todo: 0, inProgress: 0, inReview: 0, done: 0 };
+      for (const ticket of summaryRows) {
+        if (ticket.status === 'todo') fallback.todo += 1;
+        else if (ticket.status === 'in-progress') fallback.inProgress += 1;
+        else if (ticket.status === 'in-review') fallback.inReview += 1;
+        else if (ticket.status === 'done') fallback.done += 1;
+      }
+      const total = fallback.todo + fallback.inProgress + fallback.inReview + fallback.done;
+      return { ...fallback, total };
+    };
+
+    if (dashboard) {
+      const byStatus = dashboard.byStatus || {};
+      const todo = Number(byStatus['todo'] || byStatus['TODO'] || 0);
+      const inProgress = Number(byStatus['in-progress'] || byStatus['IN_PROGRESS'] || 0);
+      const inReview = Number(byStatus['in-review'] || byStatus['IN_REVIEW'] || 0);
+      const done = Number(byStatus['done'] || byStatus['DONE'] || 0);
+      const total = Number(dashboard.totalTickets ?? (todo + inProgress + inReview + done));
+      const sum = todo + inProgress + inReview + done;
+      if (sum > 0 || summaryRows.length === 0) {
+        return { todo, inProgress, inReview, done, total };
+      }
+    }
+    return fromSummaryRows();
+  }, [dashboard, summaryRows]);
 
   const stats = useMemo(() => {
     return [
@@ -237,7 +281,7 @@ const SummaryPage = () => {
                         onClick={async () => {
                           if (!projectId) return;
                           try {
-                            const t = await ticketApi.getTicketById(projectId, event.ticketId);
+                            const t = await ticketApi.getTicketById(projectId, event.ticketId as string);
                             setSelectedTicket(t);
                           } catch {
                             // ignore

@@ -10,6 +10,7 @@ import { projectApi, ProjectItem } from '@/services/projectApi';
 import { featureApi, FeatureItem } from '@/services/featureApi';
 import { useAuth } from '@/contexts/AuthContext';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import { toast } from '@/components/ui/sonner';
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -81,7 +82,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   }, [currentProjectId]);
 
   const mainNav = [
-    { label: 'For You', icon: User, to: '/for-you' },
+    ...(user?.role === 'SUPER_ADMIN' ? [] : [{ label: 'For You', icon: User, to: '/for-you' }]),
     { label: 'Recent', icon: Clock, to: '/recent' },
   ];
 
@@ -130,6 +131,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     setNewFeatureName('');
     setCreatingForProject(null);
     setExpandedFeatureSections((prev) => new Set(prev).add(projectId));
+    toast('Feature saved');
   };
 
   const requestDeleteFeature = (projectId: string, featureId: string) => {
@@ -147,6 +149,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     }));
     setConfirmDeleteOpen(false);
     setPendingDelete(null);
+    toast('Feature deleted');
   };
 
   return (
@@ -159,7 +162,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     >
       <div
         className={cn('flex items-center h-16 px-4 border-b border-sidebar-border cursor-pointer', collapsed && 'justify-center px-2')}
-        onClick={() => navigate(currentProjectId ? `/space/${currentProjectId}/board` : '/for-you')}
+        onClick={() => navigate(currentProjectId ? `/space/${currentProjectId}/board` : (user?.role === 'SUPER_ADMIN' ? '/recent' : '/for-you'))}
       >
         {collapsed ? (
           <span className="text-2xl font-bold text-sidebar-primary">T</span>

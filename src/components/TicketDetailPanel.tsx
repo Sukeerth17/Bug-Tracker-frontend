@@ -10,14 +10,18 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import { useLocation } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
+import { toast } from '@/components/ui/sonner';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, addTicketComment } = useTickets();
+  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, addTicketComment } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [statusDraft, setStatusDraft] = useState<TicketStatus>('todo');
   const [assigneeIdsDraft, setAssigneeIdsDraft] = useState<string[]>([]);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [dueDateDraft, setDueDateDraft] = useState('');
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,6 +37,9 @@ const TicketDetailPanel = () => {
     if (!ticket) return;
     setStatusDraft(ticket.status);
     setAssigneeIdsDraft(ticket.assignees.map((assignee) => assignee.id));
+    setTitleDraft(ticket.title);
+    setDescriptionDraft(ticket.description || '');
+    setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
   }, [ticket?.id, ticket?.status, ticket?.assignees]);
   useEffect(() => {
     setAssigneeOpen(false);
@@ -47,6 +54,19 @@ const TicketDetailPanel = () => {
       .then(setAvailableUsers)
       .catch(() => setAvailableUsers([]));
   }, [ticket?.id, projectId]);
+
+  useEffect(() => {
+    if (!ticket || !projectId) return;
+    Promise.all([
+      ticketApi.getComments(projectId, ticket.id).catch(() => []),
+      ticketApi.getActivityForTicket(projectId, ticket.id).catch(() => []),
+    ]).then(([comments, activity]) => {
+      setSelectedTicket((prev) => {
+        if (!prev || prev.id !== ticket.id) return prev;
+        return { ...prev, comments, activity };
+      });
+    });
+  }, [ticket?.id, projectId, setSelectedTicket]);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (!assigneeRef.current) return;
@@ -65,8 +85,12 @@ const TicketDetailPanel = () => {
     const draftAssignees = [...assigneeIdsDraft].sort();
     const assigneesChanged = currentAssignees.length !== draftAssignees.length
       || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
-    return statusChanged || assigneesChanged;
-  }, [ticket, statusDraft, assigneeIdsDraft]);
+    const titleChanged = titleDraft.trim() !== ticket.title;
+    const descChanged = (descriptionDraft || '') !== (ticket.description || '');
+    const ticketDue = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '';
+    const dueChanged = dueDateDraft !== ticketDue;
+    return statusChanged || assigneesChanged || titleChanged || descChanged || dueChanged;
+  }, [ticket, statusDraft, assigneeIdsDraft, titleDraft, descriptionDraft, dueDateDraft]);
 
   const draftAssignees = useMemo(() => {
     if (assigneeIdsDraft.length === 0) return [];
@@ -81,6 +105,17 @@ const TicketDetailPanel = () => {
     if (!ticket || !hasChanges || !projectId) return;
     setSaving(true);
     try {
+      const ticketDue = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '';
+      const detailsChanged = titleDraft.trim() !== ticket.title
+        || (descriptionDraft || '') !== (ticket.description || '')
+        || dueDateDraft !== ticketDue;
+      if (detailsChanged) {
+        await updateTicketDetails(projectId, ticket.id, {
+          title: titleDraft.trim(),
+          description: descriptionDraft || '',
+          dueDate: dueDateDraft ? dueDateDraft : null,
+        });
+      }
       if (statusDraft !== ticket.status) {
         await updateTicketStatus(projectId, ticket.id, statusDraft);
       }
@@ -90,16 +125,8 @@ const TicketDetailPanel = () => {
         || currentAssignees.some((id, idx) => id !== draftAssignees[idx]);
       if (assigneesChanged) {
         await updateTicketAssignees(projectId, ticket.id, assigneeIdsDraft);
-        setSelectedTicket((prev) => {
-          if (!prev || prev.id !== ticket.id) return prev;
-          const nextAssignees = draftAssignees;
-          return {
-            ...prev,
-            assignees: nextAssignees,
-            assignee: nextAssignees[0] || null,
-          };
-        });
       }
+      toast('Changes saved');
     } finally {
       setSaving(false);
     }
@@ -144,6 +171,9 @@ const TicketDetailPanel = () => {
     if (!ticket) return;
     setStatusDraft(ticket.status);
     setAssigneeIdsDraft(ticket.assignees.map((a) => a.id));
+    setTitleDraft(ticket.title);
+    setDescriptionDraft(ticket.description || '');
+    setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
   };
 
   const tabs = [
@@ -228,10 +258,31 @@ const TicketDetailPanel = () => {
           {activeTab === 'details' && (
             <div className="space-y-4">
               <div>
+                <label className="text-xs font-medium text-muted-foreground">Title</label>
+                <input
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                />
+              </div>
+              <div>
                 <label className="text-xs font-medium text-muted-foreground">Description</label>
-                <p className="text-sm mt-1">{ticket.description || 'No description'}</p>
+                <textarea
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  className="mt-1 min-h-[90px] w-full rounded-md border bg-background px-3 py-2 text-sm"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground">Due Date</label>
+                  <input
+                    type="date"
+                    value={dueDateDraft}
+                    onChange={(e) => setDueDateDraft(e.target.value)}
+                    className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  />
+                </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Assignees</label>
                   <div className="flex flex-wrap items-center gap-2 mt-1">

@@ -249,7 +249,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
             <div className="absolute right-0 top-full mt-2 w-96 bg-card border rounded-xl shadow-xl z-50">
               <div className="flex items-center justify-between px-4 py-3 border-b">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">For You</span>
+                <span className="text-sm font-semibold">{currentUser.role === 'SUPER_ADMIN' ? 'Recent' : 'For You'}</span>
                   <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-bold">{unreadCount}</span>
                 </div>
               </div>
@@ -265,13 +265,13 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                         if (notification.ticketId) {
                           try {
                             if (!currentProjectId) {
-                              navigate('/for-you');
+                              navigate(currentUser.role === 'SUPER_ADMIN' ? '/recent' : '/for-you');
                               return;
                             }
                             const ticket = await ticketApi.getTicketById(currentProjectId, notification.ticketId);
                             setSelectedTicket(ticket);
                           } catch {
-                            navigate('/for-you');
+                            navigate(currentUser.role === 'SUPER_ADMIN' ? '/recent' : '/for-you');
                           }
                         }
                         setNotifOpen(false);
@@ -292,7 +292,15 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
                 )}
               </div>
               <div className="border-t px-4 py-2">
-                <button onClick={() => { navigate('/for-you'); setNotifOpen(false); }} className="text-xs text-primary hover:underline">View all</button>
+                  <button
+                    onClick={() => {
+                      navigate(currentUser.role === 'SUPER_ADMIN' ? '/recent' : '/for-you');
+                      setNotifOpen(false);
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View all
+                  </button>
               </div>
             </div>
           )}

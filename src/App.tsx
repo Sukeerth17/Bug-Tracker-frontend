@@ -38,7 +38,17 @@ function ProtectedApp() {
 }
 
 function HomeRedirect() {
+  const { user } = useAuth();
+  if (user?.role === 'SUPER_ADMIN') {
+    return <Navigate to="/recent" replace />;
+  }
   return <Navigate to="/for-you" replace />;
+}
+
+function ForYouRoute({ children }: { children: any }) {
+  const { user } = useAuth();
+  if (user?.role === 'SUPER_ADMIN') return <Navigate to="/recent" replace />;
+  return children;
 }
 
 function SuperAdminRoute({ children }: { children: any }) {
@@ -96,7 +106,7 @@ function App() {
 
               <Route
                 path="/for-you"
-                element={<ForYouPage />}
+                element={<ForYouRoute><ForYouPage /></ForYouRoute>}
               />
 
               <Route

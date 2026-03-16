@@ -6,6 +6,7 @@ import { projectApi } from '@/services/projectApi';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Eye, EyeOff } from 'lucide-react';
+import { getAuthUser } from '@/services/authStorage';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,10 +23,15 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
+      const authUser = getAuthUser();
       const projects = await projectApi.getProjects();
       const firstProjectId = projects[0]?.id;
-      navigate(firstProjectId ? `/space/${firstProjectId}/board` : '/for-you');
+      if (authUser?.role === 'SUPER_ADMIN') {
+        navigate('/recent');
+      } else {
+        navigate(firstProjectId ? `/space/${firstProjectId}/board` : '/for-you');
+      }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Login failed');
     } finally {
@@ -57,6 +64,15 @@ const Login = () => {
           </div>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 rounded border"
+          />
+          Remember me
+        </label>
         <Button type="submit" disabled={loading} className="w-full">
           {loading ? 'Logging in...' : 'Login'}
         </Button>

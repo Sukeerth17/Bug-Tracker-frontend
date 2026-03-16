@@ -166,6 +166,11 @@ export const ticketApi = {
     };
   },
 
+  async updateUser(userId: string, payload: { name: string; email: string; password?: string; avatar: string }): Promise<User> {
+    const response = await api.put<ApiUser>(API_ENDPOINTS.userById.replace('{userId}', userId), payload);
+    return mapUser(response.data) as User;
+  },
+
   async deleteUser(userId: string): Promise<void> {
     await api.delete(API_ENDPOINTS.userById.replace('{userId}', userId));
   },
@@ -267,6 +272,15 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
+  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null }): Promise<Ticket> {
+    const response = await api.patch<ApiTicket>(
+      API_ENDPOINTS.ticketDetails.replace('{ticketId}', ticketId),
+      payload,
+      { params: { projectId } },
+    );
+    return mapTicket(response.data);
+  },
+
   async addComment(projectId: string, ticketId: string, text: string) {
     const response = await api.post(
       API_ENDPOINTS.ticketComments.replace('{ticketId}', ticketId),
@@ -274,5 +288,26 @@ export const ticketApi = {
       { params: { projectId } },
     );
     return response.data;
+  },
+
+  async getComments(projectId: string, ticketId: string): Promise<Ticket['comments']> {
+    const response = await api.get<ApiComment[]>(
+      API_ENDPOINTS.ticketComments.replace('{ticketId}', ticketId),
+      { params: { projectId } },
+    );
+    return (response.data || []).map((comment) => ({
+      id: comment.id,
+      user: mapUser(comment.user) as User,
+      text: comment.text,
+      createdAt: comment.createdAt,
+    }));
+  },
+
+  async getActivityForTicket(projectId: string, ticketId: string): Promise<ActivityEvent[]> {
+    const response = await api.get<ApiActivity[]>(
+      API_ENDPOINTS.ticketActivity.replace('{ticketId}', ticketId),
+      { params: { projectId } },
+    );
+    return (response.data || []).map(mapActivity);
   },
 };

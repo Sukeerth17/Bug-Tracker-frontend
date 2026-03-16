@@ -2,12 +2,14 @@ import React, { createContext, ReactNode, useCallback, useContext, useMemo, useS
 import { Department, Ticket, TicketPriority, TicketStatus, TicketType, User } from '@/data/models';
 import { ticketApi } from '@/services/ticketApi';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/components/ui/sonner';
 
 interface TicketContextType {
   currentUser: User;
   selectedTicket: Ticket | null;
   setSelectedTicket: (ticket: Ticket | null) => void;
   updateTicketStatus: (projectId: string, id: string, status: TicketStatus) => Promise<void>;
+  updateTicketDetails: (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null }) => Promise<void>;
   createTicket: (ticket: {
     projectId: string;
     featureId?: string | null;
@@ -52,6 +54,13 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
 
   const updateTicketStatus = useCallback(async (projectId: string, id: string, status: TicketStatus) => {
     const updated = await ticketApi.updateStatus(projectId, id, status);
+    setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
+    toast('Status updated');
+  }, []);
+
+  const updateTicketDetails = useCallback(async (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null }) => {
+    const updated = await ticketApi.updateDetails(projectId, id, payload);
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
     window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
   }, []);
@@ -103,6 +112,9 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
   const addTicketComment = useCallback(async (projectId: string, id: string, text: string) => {
     if (!text.trim()) return;
     await ticketApi.addComment(projectId, id, text.trim());
+    const updated = await ticketApi.getTicketById(projectId, id);
+    setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
   }, []);
 
   return (
@@ -112,6 +124,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
         selectedTicket,
         setSelectedTicket,
         updateTicketStatus,
+        updateTicketDetails,
         createTicket,
         updateTicketAssignees,
         addTicketComment,
