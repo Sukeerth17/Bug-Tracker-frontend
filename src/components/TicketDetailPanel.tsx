@@ -56,17 +56,17 @@ const TicketDetailPanel = () => {
   }, [ticket?.id, projectId]);
 
   useEffect(() => {
-    if (!ticket || !projectId) return;
+    let active = true;
+    if (!ticket || !projectId) return () => { active = false; };
     Promise.all([
       ticketApi.getComments(projectId, ticket.id).catch(() => []),
       ticketApi.getActivityForTicket(projectId, ticket.id).catch(() => []),
     ]).then(([comments, activity]) => {
-      setSelectedTicket((prev) => {
-        if (!prev || prev.id !== ticket.id) return prev;
-        return { ...prev, comments, activity };
-      });
+      if (!active) return;
+      setSelectedTicket({ ...ticket, comments, activity });
     });
-  }, [ticket?.id, projectId, setSelectedTicket]);
+    return () => { active = false; };
+  }, [ticket?.id, projectId]);
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (!assigneeRef.current) return;
