@@ -10,6 +10,7 @@ interface TicketContextType {
   setSelectedTicket: (ticket: Ticket | null) => void;
   updateTicketStatus: (projectId: string, id: string, status: TicketStatus) => Promise<void>;
   updateTicketDetails: (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null }) => Promise<void>;
+  updateTicketAttachments: (projectId: string, id: string, attachments: string[]) => Promise<void>;
   createTicket: (ticket: {
     projectId: string;
     featureId?: string | null;
@@ -61,6 +62,12 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
 
   const updateTicketDetails = useCallback(async (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null }) => {
     const updated = await ticketApi.updateDetails(projectId, id, payload);
+    setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
+  }, []);
+
+  const updateTicketAttachments = useCallback(async (projectId: string, id: string, attachments: string[]) => {
+    const updated = await ticketApi.updateAttachments(projectId, id, attachments);
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
     window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
   }, []);
@@ -125,6 +132,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
         setSelectedTicket,
         updateTicketStatus,
         updateTicketDetails,
+        updateTicketAttachments,
         createTicket,
         updateTicketAssignees,
         addTicketComment,

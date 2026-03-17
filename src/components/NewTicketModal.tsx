@@ -8,6 +8,7 @@ import { resolveFeatureId, resolveProjectId, setActiveProjectId } from '@/servic
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { ticketApi } from '@/services/ticketApi';
 import { featureApi, FeatureItem } from '@/services/featureApi';
+import { mediaApi } from '@/services/mediaApi';
 import type { User } from '@/data/models';
 import { UserAvatar } from '@/components/TicketBadges';
 
@@ -36,6 +37,8 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [creatingFeature, setCreatingFeature] = useState(false);
   const [featureError, setFeatureError] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const createStatusOptions: TicketStatus[] = ['todo', 'in-progress'];
@@ -123,7 +126,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         status,
         assignees: availableUsers.filter((user) => assigneeIds.includes(user.id)),
         dueDate: dueDate || null,
-        attachments: [],
+        attachments,
       });
       onClose();
       setTitle('');
@@ -135,6 +138,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setStatus('todo');
       setFeatureId('');
       setDueDate('');
+      setAttachments([]);
       setSubmitError('');
     } catch (err: any) {
       setSubmitError(err?.response?.data?.message || 'Failed to create ticket');
@@ -179,6 +183,49 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
           <div>
             <label className={labelCls}>Description</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-20 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Detailed description…" />
+          </div>
+          <div>
+            <label className={labelCls}>Attachments (images, max 500KB each)</label>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              multiple
+              disabled={uploading}
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length === 0) return;
+                setUploading(true);
+                try {
+                  const uploads = await Promise.all(files.map((file) => mediaApi.upload(file)));
+                  setAttachments((prev) => [...prev, ...uploads.map((u) => u.id)]);
+                } catch (err: any) {
+                  setSubmitError(err?.response?.data?.message || 'Failed to upload attachment');
+                } finally {
+                  setUploading(false);
+                  e.target.value = '';
+                }
+              }}
+              className="block w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:bg-background file:text-sm file:font-medium"
+            />
+            {attachments.length > 0 && (
+              <div className="mt-2 space-y-1">
+                {attachments.map((id) => (
+                  <div key={id} className="flex items-center justify-between text-xs border rounded-md px-2 py-1">
+                    <span>Attachment {id}</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await mediaApi.delete(id);
+                        setAttachments((prev) => prev.filter((a) => a !== id));
+                      }}
+                      className="text-destructive hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

@@ -281,6 +281,15 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
+  async updateAttachments(projectId: string, ticketId: string, attachmentIds: string[]): Promise<Ticket> {
+    const response = await api.patch<ApiTicket>(
+      API_ENDPOINTS.ticketAttachments.replace('{ticketId}', ticketId),
+      { attachmentIds: attachmentIds.map((id) => Number(id)) },
+      { params: { projectId } },
+    );
+    return mapTicket(response.data);
+  },
+
   async addComment(projectId: string, ticketId: string, text: string) {
     const response = await api.post(
       API_ENDPOINTS.ticketComments.replace('{ticketId}', ticketId),

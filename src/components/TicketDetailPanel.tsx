@@ -11,9 +11,10 @@ import { useLocation } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import { toast } from '@/components/ui/sonner';
+import { mediaApi } from '@/services/mediaApi';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, addTicketComment } = useTickets();
+  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, updateTicketAttachments, addTicketComment } = useTickets();
   const location = useLocation();
   const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
@@ -27,6 +28,7 @@ const TicketDetailPanel = () => {
   const [saving, setSaving] = useState(false);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const assigneeRef = useRef<HTMLDivElement>(null);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
@@ -61,8 +63,16 @@ const TicketDetailPanel = () => {
     Promise.all([
       ticketApi.getComments(projectId, ticket.id).catch(() => []),
       ticketApi.getActivityForTicket(projectId, ticket.id).catch(() => []),
-    ]).then(([comments, activity]) => {
+      Promise.all((ticket.attachments || []).map((id) =>
+        mediaApi.getUrl(id).then((res) => ({ id, url: res.url })).catch(() => null)
+      )),
+    ]).then(([comments, activity, urls]) => {
       if (!active) return;
+      const nextUrls: Record<string, string> = {};
+      (urls || []).forEach((row) => {
+        if (row && row.id) nextUrls[row.id] = row.url;
+      });
+      setAttachmentUrls(nextUrls);
       setSelectedTicket({ ...ticket, comments, activity });
     });
     return () => { active = false; };
@@ -360,6 +370,49 @@ const TicketDetailPanel = () => {
                   <label className="text-xs font-medium text-muted-foreground">Type</label>
                   <div className="flex items-center gap-1.5 mt-1"><TypeIcon type={ticket.type} /><span className="text-sm capitalize">{ticket.type}</span></div>
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Attachments</label>
+                {ticket.attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground mt-1">No attachments</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {ticket.attachments.map((id) => (
+                      <div key={id} className="flex items-center justify-between border rounded-md px-2 py-1 text-xs">
+                        <span>Attachment {id}</span>
+                        <div className="flex items-center gap-2">
+                          {attachmentUrls[id] && (
+                            <a
+                              href={attachmentUrls[id]}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              View
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await mediaApi.delete(id);
+                              const next = ticket.attachments.filter((a) => a !== id);
+                              await updateTicketAttachments(projectId!, ticket.id, next);
+                              setAttachmentUrls((prev) => {
+                                const copy = { ...prev };
+                                delete copy[id];
+                                return copy;
+                              });
+                              toast('Attachment deleted');
+                            }}
+                            className="text-destructive hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
