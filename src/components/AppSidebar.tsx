@@ -308,7 +308,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                                         setNewFeatureName('');
                                       }
                                     }}
-                                    className="h-7 flex-1 rounded-md border bg-background px-2 text-xs text-black placeholder:text-muted-foreground"
+                                    className="h-7 flex-1 rounded-md border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground"
                                     placeholder="New feature name"
                                   />
                                 </div>

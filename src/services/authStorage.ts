@@ -25,12 +25,21 @@ export function setAuthToken(token: string, remember?: boolean) {
   if (typeof remember === 'boolean') {
     setRememberMe(remember);
   }
-  const storage = resolveStorage();
+  const storage = typeof remember === 'boolean'
+    ? (remember ? localStorage : sessionStorage)
+    : resolveStorage();
   if (!token) {
     storage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
     return;
   }
   storage.setItem(AUTH_TOKEN_KEY, token);
+  if (storage === localStorage) {
+    sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  } else {
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+  }
 }
 
 export function getAuthUser(): User | null {
@@ -50,12 +59,21 @@ export function setAuthUser(user: User | null, remember?: boolean) {
   if (typeof remember === 'boolean') {
     setRememberMe(remember);
   }
-  const storage = resolveStorage();
+  const storage = typeof remember === 'boolean'
+    ? (remember ? localStorage : sessionStorage)
+    : resolveStorage();
   if (!user) {
     storage.removeItem(AUTH_USER_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
+    sessionStorage.removeItem(AUTH_USER_KEY);
     return;
   }
   storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+  if (storage === localStorage) {
+    sessionStorage.removeItem(AUTH_USER_KEY);
+  } else {
+    localStorage.removeItem(AUTH_USER_KEY);
+  }
 }
 
 export function clearAuthStorage() {

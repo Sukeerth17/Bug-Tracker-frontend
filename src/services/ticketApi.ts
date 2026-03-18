@@ -272,7 +272,7 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
-  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null }): Promise<Ticket> {
+  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null; priority?: Ticket['priority']; department?: Ticket['department']; type?: Ticket['type']; featureId?: string | number | null }): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketDetails.replace('{ticketId}', ticketId),
       payload,

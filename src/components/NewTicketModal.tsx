@@ -8,9 +8,9 @@ import { resolveFeatureId, resolveProjectId, setActiveProjectId } from '@/servic
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { ticketApi } from '@/services/ticketApi';
 import { featureApi, FeatureItem } from '@/services/featureApi';
-import { mediaApi } from '@/services/mediaApi';
 import type { User } from '@/data/models';
-import { UserAvatar } from '@/components/TicketBadges';
+import AttachmentUploader from '@/components/AttachmentUploader';
+import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 
 interface NewTicketModalProps {
   open: boolean;
@@ -38,7 +38,6 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [featureError, setFeatureError] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [attachments, setAttachments] = useState<string[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const createStatusOptions: TicketStatus[] = ['todo', 'in-progress'];
@@ -73,10 +72,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         setAvailableUsers(rows);
         setAssigneeIds((prev) => {
           const kept = prev.filter((id) => rows.some((user) => user.id === id));
-          if (kept.length > 0 || rows.length === 0) {
-            return kept;
-          }
-          return [rows[0].id];
+          return kept;
         });
       })
       .catch(() => {
@@ -110,7 +106,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || assigneeIds.length === 0 || !projectId || !featureId) return;
+    if (!title.trim() || !projectId || !featureId) return;
     setSubmitError('');
     setSubmitting(true);
     try {
@@ -170,12 +166,13 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-fade-in border max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-fade-in border ticket-rubber-fix">
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-base font-semibold">New Ticket</h2>
           <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
         </div>
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <div className="ticket-rubber-scroll">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 ticket-snap-form">
           <div>
             <label className={labelCls}>Title *</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Brief summary of the issue" required />
@@ -184,49 +181,12 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             <label className={labelCls}>Description</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-20 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" placeholder="Detailed description…" />
           </div>
-          <div>
-            <label className={labelCls}>Attachments (images, max 500KB each)</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              multiple
-              disabled={uploading}
-              onChange={async (e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length === 0) return;
-                setUploading(true);
-                try {
-                  const uploads = await Promise.all(files.map((file) => mediaApi.upload(file)));
-                  setAttachments((prev) => [...prev, ...uploads.map((u) => u.id)]);
-                } catch (err: any) {
-                  setSubmitError(err?.response?.data?.message || 'Failed to upload attachment');
-                } finally {
-                  setUploading(false);
-                  e.target.value = '';
-                }
-              }}
-              className="block w-full text-xs text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border file:bg-background file:text-sm file:font-medium"
-            />
-            {attachments.length > 0 && (
-              <div className="mt-2 space-y-1">
-                {attachments.map((id) => (
-                  <div key={id} className="flex items-center justify-between text-xs border rounded-md px-2 py-1">
-                    <span>Attachment {id}</span>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await mediaApi.delete(id);
-                        setAttachments((prev) => prev.filter((a) => a !== id));
-                      }}
-                      className="text-destructive hover:underline"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AttachmentUploader
+            value={attachments}
+            onChange={setAttachments}
+            label="Attachments"
+            description="Drag files here or click to browse"
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Project</label>
@@ -251,7 +211,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
                       e.preventDefault();
                       handleCreateFeature();
                     }}
-                    className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full h-9 rounded-md border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                     placeholder="Create first feature name"
                   />
                   <button
@@ -299,45 +259,15 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Assignees</label>
-            <select
-              value={assigneeIds}
-              onChange={e => setAssigneeIds(Array.from(e.target.selectedOptions, (option) => option.value))}
-              className="w-full min-h-28 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              multiple
-            >
-              {availableUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <p className="text-[10px] text-muted-foreground mt-1">Hold Ctrl/Cmd to select multiple users.</p>
-            {availableUsers.length === 0 && <p className="text-xs text-destructive mt-1">No assignable users in this project.</p>}
-            {assigneeIds.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {availableUsers
-                  .filter((user) => assigneeIds.includes(user.id))
-                  .map((user) => (
-                    <div key={user.id} className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-2 py-1">
-                      <UserAvatar name={user.name} avatar={user.avatar} />
-                      <span className="text-xs">{user.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setAssigneeIds((prev) => prev.filter((id) => id !== user.id))}
-                        className="text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-          </div>
+          <AssigneeMultiSelect users={availableUsers} value={assigneeIds} onChange={setAssigneeIds} />
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors">Cancel</button>
-            <button type="submit" disabled={submitting || availableUsers.length === 0 || assigneeIds.length === 0 || !projectId || !featureId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
+            <button type="submit" disabled={submitting || !projectId || !featureId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
           </div>
           {submitError && <p className="text-xs text-destructive">{submitError}</p>}
         </form>
+        </div>
       </div>
     </div>
   );

@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, NavLink, useLocation } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTickets } from '@/contexts/TicketContext';
-import { TypeIcon, PriorityIcon, DeptBadge, UserAvatar, GhostAvatar } from '@/components/TicketBadges';
+import { TypeIcon, PriorityIcon, DeptBadge, AssigneeStack } from '@/components/TicketBadges';
+import TicketMenu from '@/components/TicketMenu';
 import type { Ticket, TicketStatus } from '@/data/models';
 import { statusLabels } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { Plus, CheckCircle2, Paperclip } from 'lucide-react';
+import { motion } from 'framer-motion';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { toast } from '@/components/ui/sonner';
 import { resolveProjectId } from '@/services/projectControl';
@@ -27,6 +29,8 @@ const BoardPage = () => {
   const isFeatureView = Boolean(featureId);
   const [boardTickets, setBoardTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
+  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'unassigned'>('all');
+  const [settleTicketId, setSettleTicketId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = React.useState<{
     ticketId: string;
     title: string;
@@ -48,6 +52,7 @@ const BoardPage = () => {
     try {
       const response = await ticketApi.queryTickets(projectId, {
         featureId: featureId || undefined,
+        assigneeId: assigneeFilter === 'unassigned' ? 0 : undefined,
         sortBy: 'updatedAt',
         sortDir: 'desc',
         page: 0,
@@ -59,7 +64,7 @@ const BoardPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, featureId]);
+  }, [projectId, featureId, assigneeFilter]);
 
   useEffect(() => {
     loadBoard();
@@ -118,6 +123,18 @@ const BoardPage = () => {
           )}
           <h1 className="text-xl font-semibold">Board</h1>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAssigneeFilter((prev) => (prev === 'unassigned' ? 'all' : 'unassigned'))}
+            className={cn(
+              'h-8 px-3 rounded-md border text-xs font-medium transition-colors',
+              assigneeFilter === 'unassigned' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'
+            )}
+          >
+            {assigneeFilter === 'unassigned' ? 'Showing Unassigned' : 'Filter Unassigned'}
+          </button>
+        </div>
       </div>
       {loading && <div className="text-xs text-muted-foreground">Loading board...</div>}
       <DragDropContext onDragEnd={onDragEnd}>
@@ -141,20 +158,34 @@ const BoardPage = () => {
                   </div>
 
                   <div className="p-2 space-y-2 flex-1 min-h-[200px]">
+                    {loading && col.tickets.length === 0 && (
+                      <>
+                        {Array.from({ length: 3 }).map((_, idx) => (
+                          <div key={idx} className="h-20 rounded-lg bg-muted/60 animate-pulse" />
+                        ))}
+                      </>
+                    )}
                     {col.tickets.map((ticket, index) => (
                       <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
                         {(provided, snapshot) => (
-                          <div
+                          <motion.div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             onClick={() => setSelectedTicket(ticket)}
+                            layout
+                            layoutId={`ticket-${ticket.id}`}
+                            transition={{ duration: 0.35, ease: 'easeInOut' }}
+                            animate={settleTicketId === ticket.id ? { scale: [1, 1.03, 1] } : { scale: 1 }}
                             className={cn(
                               'bg-card rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all duration-150',
                               snapshot.isDragging && 'shadow-lg ring-2 ring-primary/20 rotate-1'
                             )}
                           >
-                            <p className="text-sm font-medium leading-snug mb-2">{ticket.title}</p>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <p className="text-sm font-medium leading-snug">{ticket.title}</p>
+                              <TicketMenu ticket={ticket} projectId={projectId || ticket.projectId} className="shrink-0" />
+                            </div>
                             <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                               <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                                 {ticket.projectId}
@@ -178,18 +209,9 @@ const BoardPage = () => {
                                   </span>
                                 )}
                               </div>
-                              {ticket.assignees.length > 0 ? (
-                                <div className="inline-flex items-center gap-1">
-                                  <UserAvatar name={ticket.assignees[0].name} avatar={ticket.assignees[0].avatar} />
-                                  {ticket.assignees.length > 1 && (
-                                    <span className="text-[10px] text-muted-foreground">+{ticket.assignees.length - 1}</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <GhostAvatar />
-                              )}
+                              <AssigneeStack assignees={ticket.assignees} />
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                       </Draggable>
                     ))}
@@ -209,6 +231,19 @@ const BoardPage = () => {
           ))}
         </div>
       </DragDropContext>
+      {!loading && boardTickets.length === 0 && (
+        <div className="mt-6 rounded-xl border bg-card p-6 text-center">
+          <p className="text-sm font-medium">No tickets yet</p>
+          <p className="text-xs text-muted-foreground mt-1">Create your first ticket to start tracking work.</p>
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('ticket:new', { detail: { status: 'todo' } }))}
+            className="mt-3 inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create Ticket
+          </button>
+        </div>
+      )}
       <ConfirmationModal
         isOpen={!!pendingMove}
         title="Move Ticket"
@@ -226,6 +261,8 @@ const BoardPage = () => {
             await updateTicketStatus(projectId, ticketId, toStatus);
           }
           await loadBoard();
+          setSettleTicketId(ticketId);
+          setTimeout(() => setSettleTicketId(null), 500);
           toast(`Ticket moved to ${statusLabels[toStatus]}`);
         }}
         onCancel={() => setPendingMove(null)}

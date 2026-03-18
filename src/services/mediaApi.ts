@@ -19,8 +19,10 @@ export const mediaApi = {
     return { ...response.data, id: String(response.data.id) };
   },
 
-  async getUrl(id: string): Promise<{ url: string; expiresAt: string }> {
-    const response = await api.get<{ url: string; expiresAt: string }>(API_ENDPOINTS.mediaUrl.replace('{id}', id));
+  async getUrl(id: string): Promise<{ url: string; expiresAt: string; filename: string; contentType: string; sizeBytes: number }> {
+    const response = await api.get<{ url: string; expiresAt: string; filename: string; contentType: string; sizeBytes: number }>(
+      API_ENDPOINTS.mediaUrl.replace('{id}', id)
+    );
     return response.data;
   },
 

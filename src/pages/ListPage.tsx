@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
-import { PriorityIcon, TypeIcon, UserAvatar, GhostAvatar, StatusBadge } from '@/components/TicketBadges';
+import { PriorityIcon, TypeIcon, UserAvatar, StatusBadge, AssigneeStack } from '@/components/TicketBadges';
+import TicketMenu from '@/components/TicketMenu';
 import { priorityLabels, statusLabels, Ticket } from '@/data/models';
 import type { TicketPriority, TicketStatus } from '@/data/models';
 import { format } from 'date-fns';
@@ -29,6 +30,7 @@ const ListPage = () => {
   const [sortAsc, setSortAsc] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | TicketPriority>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'unassigned'>('all');
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -50,6 +52,7 @@ const ListPage = () => {
         q: search.trim() || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         priority: priorityFilter === 'all' ? undefined : priorityFilter,
+        assigneeId: assigneeFilter === 'unassigned' ? 0 : undefined,
         sortBy: sortKey,
         sortDir: sortAsc ? 'asc' : 'desc',
         page,
@@ -66,7 +69,7 @@ const ListPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [projectId, featureId, search, statusFilter, priorityFilter, sortKey, sortAsc, page, pageSize]);
+  }, [projectId, featureId, search, statusFilter, priorityFilter, assigneeFilter, sortKey, sortAsc, page, pageSize]);
 
   useEffect(() => {
     loadTickets();
@@ -211,6 +214,17 @@ const ListPage = () => {
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
+          <select
+            value={assigneeFilter}
+            onChange={(e) => {
+              setAssigneeFilter(e.target.value as 'all' | 'unassigned');
+              setPage(0);
+            }}
+            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="all">All Assignees</option>
+            <option value="unassigned">Unassigned</option>
+          </select>
         </div>
       </div>
 
@@ -238,6 +252,19 @@ const ListPage = () => {
               </tr>
             </thead>
             <tbody>
+              {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, idx) => (
+                <tr key={`skeleton-${idx}`} className="border-b">
+                  <td className="px-3 py-2"><div className="h-4 w-4 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-48 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-20 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-20 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-16 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-16 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-20 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-20 rounded bg-muted/60 animate-pulse" /></td>
+                  <td className="px-3 py-2"><div className="h-4 w-20 rounded bg-muted/60 animate-pulse" /></td>
+                </tr>
+              ))}
               {rows.map((ticket, i) => (
                 <tr key={ticket.id} className={cn('border-b transition-colors hover:bg-accent/50', i % 2 === 1 && 'bg-muted/20')}>
                   <td className="px-3 py-2">
@@ -253,7 +280,7 @@ const ListPage = () => {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-start gap-2">
                       <TypeIcon type={ticket.type} />
                       <span className="font-mono text-xs text-muted-foreground">{ticket.id}</span>
                       {ticket.attachments.length > 0 && (
@@ -262,7 +289,7 @@ const ListPage = () => {
                           {ticket.attachments.length}
                         </span>
                       )}
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <button
                           onClick={() => setSelectedTicket(ticket)}
                           className="text-sm hover:text-primary hover:underline transition-colors truncate max-w-xs text-left"
@@ -280,17 +307,11 @@ const ListPage = () => {
                           )}
                         </div>
                       </div>
+                      <TicketMenu ticket={ticket} projectId={projectId || ticket.projectId} className="mt-0.5" />
                     </div>
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
-                      {ticket.assignees.length > 0 ? (
-                        <>
-                          <UserAvatar name={ticket.assignees[0].name} avatar={ticket.assignees[0].avatar} />
-                          <span className="text-xs hidden xl:inline">{ticket.assignees[0].name}{ticket.assignees.length > 1 ? ` +${ticket.assignees.length - 1}` : ''}</span>
-                        </>
-                      ) : <GhostAvatar />}
-                    </div>
+                    <AssigneeStack assignees={ticket.assignees} />
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5">
@@ -360,6 +381,12 @@ const ListPage = () => {
           </div>
         </div>
       </div>
+      {!loading && rows.length === 0 && (
+        <div className="rounded-xl border bg-card p-6 text-center">
+          <p className="text-sm font-medium">No tickets found</p>
+          <p className="text-xs text-muted-foreground mt-1">Try adjusting your filters or create a new ticket.</p>
+        </div>
+      )}
     </div>
   );
 };

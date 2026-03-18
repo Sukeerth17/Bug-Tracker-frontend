@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft, Sun, Moon } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
 import type { Ticket } from '@/data/models';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { notificationApi, NotificationItem } from '@/services/notificationApi';
 import { ticketApi } from '@/services/ticketApi';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import { useThemeMode } from '@/hooks/useTheme';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -33,6 +34,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { theme, toggleTheme } = useThemeMode();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -229,6 +231,13 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
       </div>
 
       <div className="ml-auto flex items-center gap-2">
+        <button
+          onClick={toggleTheme}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-background/70 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          aria-label="Toggle theme"
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
         <button
           onClick={onNewTicket}
           className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
