@@ -168,50 +168,53 @@ const BoardPage = () => {
                     {col.tickets.map((ticket, index) => (
                       <Draggable key={ticket.id} draggableId={ticket.id} index={index}>
                         {(provided, snapshot) => (
-                          <motion.div
+                          <div
                             ref={provided.innerRef}
                             {...provided.draggableProps}
                             {...provided.dragHandleProps}
                             onClick={() => setSelectedTicket(ticket)}
-                            layout
-                            layoutId={`ticket-${ticket.id}`}
-                            transition={{ duration: 0.35, ease: 'easeInOut' }}
-                            animate={settleTicketId === ticket.id ? { scale: [1, 1.03, 1] } : { scale: 1 }}
-                            className={cn(
-                              'bg-card rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all duration-150',
-                              snapshot.isDragging && 'shadow-lg ring-2 ring-primary/20 rotate-1'
-                            )}
                           >
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <p className="text-sm font-medium leading-snug">{ticket.title}</p>
-                              <TicketMenu ticket={ticket} projectId={projectId || ticket.projectId} className="shrink-0" />
-                            </div>
-                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                              <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                {ticket.projectId}
-                              </span>
-                              {ticket.featureName && (
-                                <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                  {ticket.featureName}
-                                </span>
+                            <motion.div
+                              layout
+                              layoutId={`ticket-${ticket.id}`}
+                              transition={{ duration: 0.35, ease: 'easeInOut' }}
+                              animate={settleTicketId === ticket.id ? { scale: [1, 1.03, 1] } : { scale: 1 }}
+                              className={cn(
+                                'bg-card rounded-lg border p-3 cursor-pointer hover:shadow-md transition-all duration-150',
+                                snapshot.isDragging && 'shadow-lg ring-2 ring-primary/20 rotate-1'
                               )}
-                              <DeptBadge department={ticket.department} />
-                              <PriorityIcon priority={ticket.priority} />
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1">
-                                <TypeIcon type={ticket.type} />
-                                <span className="font-mono text-[10px] text-muted-foreground">{ticket.id}</span>
-                                {ticket.attachments.length > 0 && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                                    <Paperclip className="h-3 w-3" />
-                                    {ticket.attachments.length}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <p className="text-sm font-medium leading-snug">{ticket.title}</p>
+                                <TicketMenu ticket={ticket} projectId={projectId || ticket.projectId} className="shrink-0" />
+                              </div>
+                              <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                  {ticket.projectId}
+                                </span>
+                                {ticket.featureName && (
+                                  <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                    {ticket.featureName}
                                   </span>
                                 )}
+                                <DeptBadge department={ticket.department} />
+                                <PriorityIcon priority={ticket.priority} />
                               </div>
-                              <AssigneeStack assignees={ticket.assignees} />
-                            </div>
-                          </motion.div>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1">
+                                  <TypeIcon type={ticket.type} />
+                                  <span className="font-mono text-[10px] text-muted-foreground">{ticket.id}</span>
+                                  {ticket.attachments.length > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                                      <Paperclip className="h-3 w-3" />
+                                      {ticket.attachments.length}
+                                    </span>
+                                  )}
+                                </div>
+                                <AssigneeStack assignees={ticket.assignees} />
+                              </div>
+                            </motion.div>
+                          </div>
                         )}
                       </Draggable>
                     ))}
