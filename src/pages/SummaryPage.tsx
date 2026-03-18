@@ -8,7 +8,7 @@ import type { ActivityEvent, Department, TicketStatus, Ticket } from '@/data/mod
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dashboardApi, DashboardSummary } from '@/services/dashboardApi';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 
@@ -24,7 +24,8 @@ type SortKey = 'department' | 'status' | 'assignee';
 const SummaryPage = () => {
   const { setSelectedTicket } = useTickets();
   const location = useLocation();
-  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const { spaceId } = useParams();
+  const projectId = spaceId || resolveProjectId(location.pathname);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityTickets, setActivityTickets] = useState<Record<string, Ticket>>({});
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft, Sun, Moon } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
 import type { Ticket } from '@/data/models';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { notificationApi, NotificationItem } from '@/services/notificationApi';
 import { ticketApi } from '@/services/ticketApi';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { useThemeMode } from '@/hooks/useTheme';
+import { resolveProjectId } from '@/services/projectControl';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -21,10 +22,10 @@ interface TopHeaderProps {
 const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeaderProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { spaceId } = useParams();
   const { setSelectedTicket, currentUser } = useTickets();
   const { logout } = useAuth();
-  const parts = location.pathname.split('/');
-  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : 'sp1';
+  const currentProjectId = useMemo(() => spaceId || resolveProjectId(location.pathname), [spaceId, location.pathname]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -151,10 +152,18 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
 
   const markNotificationRead = async (notificationId: number) => {
     const updated = await notificationApi.markRead(notificationId);
-    setNotifications((prev) => prev.map((item) => item.id === notificationId ? updated : item));
+    setNotifications((prev) => prev.filter((item) => item.id !== notificationId));
     if (updated.isRead) {
       setUnreadCount((prev) => Math.max(0, prev - 1));
     }
+  };
+
+  const markAllNotificationsRead = async () => {
+    if (unreadNotifications.length === 0) return;
+    const unreadIds = unreadNotifications.map((notification) => notification.id);
+    await Promise.all(unreadIds.map((id) => notificationApi.markRead(id)));
+    setNotifications((prev) => prev.filter((item) => !unreadIds.includes(item.id)));
+    setUnreadCount(0);
   };
 
   useEffect(() => {
@@ -302,7 +311,12 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
               </div>
               <div className="border-t px-4 py-2">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      try {
+                        await markAllNotificationsRead();
+                      } catch {
+                        // ignore notification read failures and continue navigation
+                      }
                       navigate(currentUser.role === 'SUPER_ADMIN' ? '/recent' : '/for-you');
                       setNotifOpen(false);
                     }}

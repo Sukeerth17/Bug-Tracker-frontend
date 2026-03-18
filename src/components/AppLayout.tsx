@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import AppSidebar from '@/components/AppSidebar';
 import TopHeader from '@/components/TopHeader';
 import NewTicketModal from '@/components/NewTicketModal';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { TicketStatus } from '@/data/models';
 
 const AppLayout = () => {
+  const location = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [newTicketOpen, setNewTicketOpen] = useState(false);
   const [newTicketDefaultStatus, setNewTicketDefaultStatus] = useState<TicketStatus>('todo');
@@ -36,7 +37,7 @@ const AppLayout = () => {
         onNewTicket={() => openNewTicket('todo')}
       />
       <main className={cn('transition-all duration-200', sidebarCollapsed ? 'ml-[60px]' : 'ml-[240px]')}>
-        <Outlet />
+        <Outlet key={location.pathname} />
       </main>
       <NewTicketModal open={newTicketOpen} onClose={() => setNewTicketOpen(false)} defaultStatus={newTicketDefaultStatus} />
       <TicketDetailPanel />

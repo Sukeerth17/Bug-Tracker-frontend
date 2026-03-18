@@ -10,9 +10,13 @@ export interface MediaUploadResult {
 }
 
 export const mediaApi = {
-  async upload(file: File): Promise<MediaUploadResult> {
+  async upload(file: File, options: { projectId: string; featureName?: string }): Promise<MediaUploadResult> {
     const form = new FormData();
     form.append('file', file);
+    form.append('projectId', options.projectId);
+    if (options.featureName) {
+      form.append('featureName', options.featureName);
+    }
     const response = await api.post<MediaUploadResult>(API_ENDPOINTS.mediaUpload, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

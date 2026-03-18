@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { PriorityIcon, TypeIcon, UserAvatar, StatusBadge, AssigneeStack } from '@/components/TicketBadges';
 import TicketMenu from '@/components/TicketMenu';
@@ -19,7 +19,7 @@ const ListPage = () => {
   const { setSelectedTicket } = useTickets();
   const location = useLocation();
   const { spaceId, featureId } = useParams();
-  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const projectId = spaceId || resolveProjectId(location.pathname);
   const isFeatureView = Boolean(featureId);
 
   const [rows, setRows] = useState<Ticket[]>([]);

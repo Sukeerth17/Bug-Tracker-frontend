@@ -86,7 +86,13 @@ const AdminProjectsPage = () => {
       >
         <div className="grid md:grid-cols-2 gap-3">
           <input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" placeholder="Project name *" required />
-          <input value={startDate} onChange={(e) => setStartDate(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm" type="date" />
+          <input
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            className="date-input h-9 rounded-md border bg-background px-3 text-sm"
+            type="date"
+          />
           <input value={description} onChange={(e) => setDescription(e.target.value)} className="h-9 rounded-md border bg-background px-3 text-sm md:col-span-2" placeholder="Description" />
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}

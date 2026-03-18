@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MoreVertical } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreVertical, Trash2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { featureApi, FeatureItem } from '@/services/featureApi';
 import { useTickets } from '@/contexts/TicketContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { ticketApi } from '@/services/ticketApi';
 import type { Ticket } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -15,6 +17,7 @@ type TicketMenuProps = {
 
 const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
   const { updateTicketDetails } = useTickets();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
   const [selectedId, setSelectedId] = useState(ticket.featureId ? String(ticket.featureId) : '');
@@ -53,6 +56,16 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
     } catch {
       setSelectedId(previous);
     }
+  };
+
+  const handleDelete = async () => {
+    const effectiveProjectId = projectId || ticket.projectId;
+    if (!effectiveProjectId) return;
+    const confirmed = window.confirm(`Delete ticket ${ticket.id}?`);
+    if (!confirmed) return;
+    await ticketApi.deleteTicket(effectiveProjectId, ticket.id);
+    setOpen(false);
+    window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId: effectiveProjectId } }));
   };
 
   return (
@@ -102,6 +115,21 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
             ))}
           </select>
         </div>
+        {user?.role === 'SUPER_ADMIN' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                void handleDelete();
+              }}
+              className="mx-1 rounded-lg text-red-600 focus:bg-red-50 focus:text-red-700 dark:text-red-400 dark:focus:bg-red-500/10 dark:focus:text-red-300"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Ticket
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

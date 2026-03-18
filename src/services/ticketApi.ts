@@ -290,6 +290,12 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
+  async deleteTicket(projectId: string, ticketId: string): Promise<void> {
+    await api.delete(API_ENDPOINTS.ticketById.replace('{ticketId}', ticketId), {
+      params: { projectId },
+    });
+  },
+
   async addComment(projectId: string, ticketId: string, text: string) {
     const response = await api.post(
       API_ENDPOINTS.ticketComments.replace('{ticketId}', ticketId),

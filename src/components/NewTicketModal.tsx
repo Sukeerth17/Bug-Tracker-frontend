@@ -184,8 +184,10 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
           <AttachmentUploader
             value={attachments}
             onChange={setAttachments}
+            projectId={projectId}
+            featureName={features.find((feature) => feature.id === featureId)?.name ?? null}
             label="Attachments"
-            description="Drag files here or click to browse"
+            description="Drag images or videos here, or click to browse"
           />
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -255,7 +257,13 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             </div>
             <div>
               <label className={labelCls}>Due Date</label>
-              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className={selectCls} />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                className={`${selectCls} date-input`}
+              />
             </div>
           </div>
 

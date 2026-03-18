@@ -31,8 +31,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<{ projectId: string; featureId: string } | null>(null);
 
-  const parts = location.pathname.split('/');
-  const currentProjectId = parts[1] === 'space' && parts[2] ? parts[2] : (projects[0]?.id || '');
+  const currentProjectId = getProjectIdFromPathname(location.pathname) || projects[0]?.id || '';
 
   const loadProjects = React.useCallback(() => {
     projectApi.getProjects().then(setProjects).catch(() => setProjects([]));

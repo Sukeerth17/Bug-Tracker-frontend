@@ -7,7 +7,7 @@ import type { TicketStatus, User } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 import ConfirmationModal from '@/components/ConfirmationModal';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import { mediaApi } from '@/services/mediaApi';
@@ -17,9 +17,10 @@ import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 import AttachmentUploader from '@/components/AttachmentUploader';
 
 const TicketDetailPanel = () => {
-  const { selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, updateTicketAttachments, addTicketComment } = useTickets();
+  const { currentUser, selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, updateTicketAttachments, addTicketComment } = useTickets();
   const location = useLocation();
-  const projectId = useMemo(() => resolveProjectId(location.pathname), [location.pathname]);
+  const { spaceId } = useParams();
+  const projectId = spaceId || resolveProjectId(location.pathname);
   const [activeTab, setActiveTab] = useState<'details' | 'activity' | 'comments'>('details');
   const [statusDraft, setStatusDraft] = useState<TicketStatus>('todo');
   const [assigneeIdsDraft, setAssigneeIdsDraft] = useState<string[]>([]);
@@ -110,10 +111,11 @@ const TicketDetailPanel = () => {
     setSaving(true);
     try {
       const ticketDue = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '';
-      const detailsChanged = titleDraft.trim() !== ticket.title
+      const detailFieldChanged = titleDraft.trim() !== ticket.title
         || (descriptionDraft || '') !== (ticket.description || '')
-        || dueDateDraft !== ticketDue
-        || (ticket.featureId ? String(ticket.featureId) : '') !== featureIdDraft;
+        || dueDateDraft !== ticketDue;
+      const featureChanged = (ticket.featureId ? String(ticket.featureId) : '') !== featureIdDraft;
+      const detailsChanged = detailFieldChanged || featureChanged;
       if (detailsChanged) {
         await updateTicketDetails(effectiveProjectId, ticket.id, {
           title: titleDraft.trim(),
@@ -234,7 +236,8 @@ const TicketDetailPanel = () => {
             type="date"
             value={dueDateDraft}
             onChange={(e) => setDueDateDraft(e.target.value)}
-            className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+            onClick={(e) => e.currentTarget.showPicker?.()}
+            className="date-input mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
           />
         </div>
         <div>
@@ -271,7 +274,10 @@ const TicketDetailPanel = () => {
               <AttachmentUploader
                 value={attachmentDraft}
                 onChange={(next) => setAttachmentDraft(next)}
+                projectId={effectiveProjectId}
+                featureName={availableFeatures.find((feature) => feature.id === featureIdDraft)?.name || ticket.featureName || null}
                 label="Attachments"
+                description="Drag images or videos here, or click to browse"
               />
     </div>
   );

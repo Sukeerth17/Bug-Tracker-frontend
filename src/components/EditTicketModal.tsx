@@ -190,7 +190,13 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
 
             <div>
               <label className="text-xs font-semibold text-muted-foreground">Due Date</label>
-              <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-10 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full" />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                onClick={(e) => e.currentTarget.showPicker?.()}
+                className="date-input h-10 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full"
+              />
             </div>
           </div>
 
@@ -243,7 +249,14 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
 
           <AssigneeMultiSelect users={availableUsers} value={assigneeIds} onChange={setAssigneeIds} />
 
-          <AttachmentUploader value={attachments} onChange={setAttachments} label="Attachments" description="Drag files here or click to browse" />
+          <AttachmentUploader
+            value={attachments}
+            onChange={setAttachments}
+            projectId={projectId || undefined}
+            featureName={selectedFeatures[0]?.name ?? null}
+            label="Attachments"
+            description="Drag images or videos here, or click to browse"
+          />
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 border-t bg-muted/30">
