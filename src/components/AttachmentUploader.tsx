@@ -99,9 +99,13 @@ const AttachmentUploader = ({
     if (disabled || files.length === 0) return;
 
     const rejectedNonImages = files.filter((file) => !file.type.startsWith('image/'));
-    const acceptedFiles = files.filter((file) => file.type.startsWith('image/'));
+    const oversizeImages = files.filter((file) => file.type.startsWith('image/') && file.size > 5 * 1024 * 1024);
+    const acceptedFiles = files.filter((file) => file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024);
     if (rejectedNonImages.length > 0) {
       toast('Only images are allowed');
+    }
+    if (oversizeImages.length > 0) {
+      toast('Max image size is 5MB');
     }
     if (acceptedFiles.length === 0) return;
 
