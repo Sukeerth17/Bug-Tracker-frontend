@@ -1,6 +1,7 @@
 ﻿import api from '@/services/api';
 import { API_ENDPOINTS, getApiBaseUrl } from '@/services/controlApi';
 import { getAuthToken } from '@/services/authStorage';
+import { handleSessionExpired } from '@/services/authSession';
 
 export interface NotificationItem {
   id: number;
@@ -38,9 +39,35 @@ export const notificationApi = {
     return response.data;
   },
 
+  async markAllRead(): Promise<number> {
+    const response = await api.patch<{ count: number }>(`${API_ENDPOINTS.notifications}/read-all`);
+    return response.data.count || 0;
+  },
+
   subscribe(onMessage: (item: NotificationItem) => void): EventSource | null {
+    const parseTokenExpiry = (jwt: string): number | null => {
+      try {
+        const payload = jwt.split('.')[1];
+        if (!payload) return null;
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = JSON.parse(atob(normalized));
+        return typeof decoded.exp === 'number' ? decoded.exp : null;
+      } catch {
+        return null;
+      }
+    };
+    const isExpired = (jwt: string): boolean => {
+      const exp = parseTokenExpiry(jwt);
+      if (!exp) return false;
+      return Date.now() >= exp * 1000;
+    };
+
     const token = getAuthToken();
     if (!token) {
+      return null;
+    }
+    if (isExpired(token)) {
+      handleSessionExpired();
       return null;
     }
     const url = `${getApiBaseUrl()}${API_ENDPOINTS.notificationStream}?access_token=${encodeURIComponent(token)}`;
@@ -52,7 +79,13 @@ export const notificationApi = {
         // ignore malformed SSE payloads
       }
     });
+    es.onerror = () => {
+      const currentToken = getAuthToken();
+      if (!currentToken || isExpired(currentToken)) {
+        es.close();
+        handleSessionExpired();
+      }
+    };
     return es;
   },
 };
-

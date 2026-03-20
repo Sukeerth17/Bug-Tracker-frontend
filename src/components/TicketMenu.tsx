@@ -8,6 +8,8 @@ import { ticketApi } from '@/services/ticketApi';
 import type { Ticket } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
+import UnsavedChangesBadge from '@/components/UnsavedChangesBadge';
 
 type TicketMenuProps = {
   ticket: Ticket;
@@ -21,9 +23,11 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
   const [open, setOpen] = useState(false);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
   const [selectedId, setSelectedId] = useState(ticket.featureId ? String(ticket.featureId) : '');
+  const [draftId, setDraftId] = useState(ticket.featureId ? String(ticket.featureId) : '');
 
   useEffect(() => {
     setSelectedId(ticket.featureId ? String(ticket.featureId) : '');
+    setDraftId(ticket.featureId ? String(ticket.featureId) : '');
   }, [ticket.featureId, ticket.id]);
 
   useEffect(() => {
@@ -31,7 +35,7 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
     const effectiveProjectId = projectId || ticket.projectId;
     if (!effectiveProjectId) return;
     featureApi.getFeatures(effectiveProjectId)
-      .then(setFeatures)
+      .then((rows) => setFeatures([...rows].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))))
       .catch(() => setFeatures([]));
   }, [open, projectId, ticket.projectId]);
 
@@ -40,21 +44,19 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
     return features.find((feature) => feature.id === selectedId)?.name || ticket.featureName || 'Feature';
   }, [features, selectedId, ticket.featureName]);
 
-  const handleFeatureChange = async (nextId: string) => {
-    const previous = selectedId;
-    setSelectedId(nextId);
-    setOpen(false);
-
+  const handleFeatureSave = async () => {
     const dueDate = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : null;
     try {
       await updateTicketDetails(projectId || ticket.projectId, ticket.id, {
         title: ticket.title,
         description: ticket.description || '',
         dueDate,
-        featureId: nextId ? Number(nextId) : null,
+        featureId: draftId ? Number(draftId) : null,
       });
+      setSelectedId(draftId);
+      setOpen(false);
     } catch {
-      setSelectedId(previous);
+      setDraftId(selectedId);
     }
   };
 
@@ -103,17 +105,28 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
         </div>
         <DropdownMenuSeparator />
         <div className="px-2 pb-2">
-          <label className="text-[11px] font-semibold text-muted-foreground">Change feature</label>
-          <select
-            value={selectedId}
-            onChange={(e) => handleFeatureChange(e.target.value)}
-            className="mt-2 h-9 w-full rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="">No Feature</option>
-            {features.map((feature) => (
-              <option key={feature.id} value={feature.id}>{feature.name}</option>
-            ))}
-          </select>
+          <SearchableFeatureSelect features={features} value={draftId} onChange={setDraftId} label="Change feature" />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <UnsavedChangesBadge visible={draftId !== selectedId} />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDraftId(selectedId)}
+                disabled={draftId === selectedId}
+                className="h-8 rounded-md border px-3 text-xs disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleFeatureSave()}
+                disabled={draftId === selectedId}
+                className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-60"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
         </div>
         {user?.role === 'SUPER_ADMIN' && (
           <>

@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { X, MessageSquare, Activity, FileText, Maximize2, Minimize2 } from 'lucide-react';
+import { X, MessageSquare, Activity, FileText, Maximize2, Minimize2, Users } from 'lucide-react';
 import { statusLabels } from '@/data/models';
-import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar } from './TicketBadges';
+import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge, UserAvatar, AssigneeStack } from './TicketBadges';
 import { useTickets } from '@/contexts/TicketContext';
-import type { TicketStatus, User } from '@/data/models';
+import type { Department, TicketStatus, TicketType, User } from '@/data/models';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow, format } from 'date-fns';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -15,6 +15,10 @@ import { featureApi, FeatureItem } from '@/services/featureApi';
 import { toast } from '@/components/ui/sonner';
 import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 import AttachmentUploader from '@/components/AttachmentUploader';
+import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
+import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
+import UnsavedChangesBadge from '@/components/UnsavedChangesBadge';
+import { typeLabels } from '@/data/models';
 
 const TicketDetailPanel = () => {
   const { currentUser, selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, updateTicketAttachments, addTicketComment } = useTickets();
@@ -27,6 +31,8 @@ const TicketDetailPanel = () => {
   const [titleDraft, setTitleDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState('');
   const [dueDateDraft, setDueDateDraft] = useState('');
+  const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>([]);
+  const [typeDraft, setTypeDraft] = useState<TicketType>('task');
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,6 +55,8 @@ const TicketDetailPanel = () => {
     setTitleDraft(ticket.title);
     setDescriptionDraft(ticket.description || '');
     setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
+    setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
+    setTypeDraft(ticket.type);
     setFeatureIdDraft(ticket.featureId ? String(ticket.featureId) : '');
     const baseAttachments = ticket.attachments || [];
     setAttachmentDraft(baseAttachments);
@@ -99,10 +107,14 @@ const TicketDetailPanel = () => {
     const descChanged = (descriptionDraft || '') !== (ticket.description || '');
     const ticketDue = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '';
     const dueChanged = dueDateDraft !== ticketDue;
+    const savedDepartments = [...(ticket.departments?.length ? ticket.departments : [ticket.department])].sort();
+    const draftDepartments = [...departmentsDraft].sort();
+    const departmentsChanged = savedDepartments.join(',') !== draftDepartments.join(',');
+    const typeChanged = typeDraft !== ticket.type;
     const featureChanged = (ticket.featureId ? String(ticket.featureId) : '') !== featureIdDraft;
     const attachmentsChanged = (attachmentDraft || []).join(',') !== (ticket.attachments || []).join(',');
-    return statusChanged || assigneesChanged || titleChanged || descChanged || dueChanged || featureChanged || attachmentsChanged;
-  }, [ticket, statusDraft, assigneeIdsDraft, titleDraft, descriptionDraft, dueDateDraft, featureIdDraft, attachmentDraft]);
+    return statusChanged || assigneesChanged || titleChanged || descChanged || dueChanged || departmentsChanged || typeChanged || featureChanged || attachmentsChanged;
+  }, [ticket, statusDraft, assigneeIdsDraft, titleDraft, descriptionDraft, dueDateDraft, departmentsDraft, typeDraft, featureIdDraft, attachmentDraft]);
 
   // Keep draft assignees in sync with server list to drive the multi-select UI.
 
@@ -116,11 +128,19 @@ const TicketDetailPanel = () => {
         || dueDateDraft !== ticketDue;
       const featureChanged = (ticket.featureId ? String(ticket.featureId) : '') !== featureIdDraft;
       const detailsChanged = detailFieldChanged || featureChanged;
-      if (detailsChanged) {
+      const savedDepartments = [...(ticket.departments?.length ? ticket.departments : [ticket.department])].sort();
+      const draftDepartments = [...departmentsDraft].sort();
+      const departmentsChanged = savedDepartments.join(',') !== draftDepartments.join(',');
+      const typeChanged = typeDraft !== ticket.type;
+      const detailsOrMetaChanged = detailsChanged || departmentsChanged || typeChanged;
+      if (detailsOrMetaChanged) {
         await updateTicketDetails(effectiveProjectId, ticket.id, {
           title: titleDraft.trim(),
           description: descriptionDraft || '',
           dueDate: dueDateDraft ? dueDateDraft : null,
+          department: departmentsDraft[0] || ticket.department,
+          departmentIds: departmentsDraft,
+          type: typeDraft,
           featureId: featureIdDraft ? Number(featureIdDraft) : null,
         });
       }
@@ -199,6 +219,8 @@ const TicketDetailPanel = () => {
     setTitleDraft(ticket.title);
     setDescriptionDraft(ticket.description || '');
     setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
+    setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
+    setTypeDraft(ticket.type);
     setFeatureIdDraft(ticket.featureId ? String(ticket.featureId) : '');
     const baseAttachments = ticket.attachments || [];
     setAttachmentDraft(baseAttachments);
@@ -251,6 +273,16 @@ const TicketDetailPanel = () => {
           </div>
         </div>
         <div>
+          <label className="text-xs font-medium text-muted-foreground flex items-center gap-1"><Users className="h-3.5 w-3.5" />Assignees</label>
+          <div className="mt-1">
+            {ticket.assignees.length > 0 ? (
+              <AssigneeStack assignees={ticket.assignees} size="md" max={3} />
+            ) : (
+              <span className="text-sm text-muted-foreground">Unassigned</span>
+            )}
+          </div>
+        </div>
+        <div>
           <label className="text-xs font-medium text-muted-foreground">Created</label>
           <p className="text-sm mt-1">{format(new Date(ticket.createdAt), 'MMM d, yyyy, h:mm a')}</p>
         </div>
@@ -268,7 +300,18 @@ const TicketDetailPanel = () => {
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground">Type</label>
-          <div className="flex items-center gap-1.5 mt-1"><TypeIcon type={ticket.type} /><span className="text-sm capitalize">{ticket.type}</span></div>
+          <select
+            value={typeDraft}
+            onChange={(e) => setTypeDraft(e.target.value as TicketType)}
+            className="mt-1 h-9 w-full rounded-md border bg-background px-3 text-sm"
+          >
+            {Object.entries(typeLabels).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-2">
+          <DepartmentMultiSelect value={departmentsDraft} onChange={setDepartmentsDraft} />
         </div>
       </div>
               <AttachmentUploader
@@ -387,17 +430,15 @@ const TicketDetailPanel = () => {
               <span className="inline-flex items-center rounded-full border bg-primary/10 text-primary px-3 py-1 text-xs font-semibold shadow-sm">
                 Feature: {featureIdDraft ? (availableFeatures.find((f) => f.id === featureIdDraft)?.name || ticket.featureName || 'Feature') : 'No feature'}
               </span>
-              <select
-                value={featureIdDraft}
-                onChange={(e) => setFeatureIdDraft(e.target.value)}
-                className="h-7 rounded-full text-xs font-medium border-0 bg-muted px-3 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="">No Feature</option>
-                {availableFeatures.map((feature) => (
-                  <option key={feature.id} value={feature.id}>{feature.name}</option>
-                ))}
-              </select>
             </div>
+          </div>
+          <div className="mt-3 max-w-xs">
+            <SearchableFeatureSelect
+              features={availableFeatures}
+              value={featureIdDraft}
+              onChange={setFeatureIdDraft}
+              label="Feature"
+            />
           </div>
         </div>
 
@@ -410,8 +451,11 @@ const TicketDetailPanel = () => {
             {Object.entries(statusLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <PriorityIcon priority={ticket.priority} />
-          <DeptBadge department={ticket.department} />
+          {(departmentsDraft.length > 0 ? departmentsDraft : [ticket.department]).map((department) => (
+            <DeptBadge key={department} department={department} />
+          ))}
           <div className="ml-auto flex items-center gap-2">
+            <UnsavedChangesBadge visible={hasChanges} />
             <button
               type="button"
               disabled={!hasChanges || saving}

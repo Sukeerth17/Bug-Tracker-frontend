@@ -4,13 +4,15 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, UserAvatar, DeptBadge } from '@/components/TicketBadges';
 import { statusLabels, departments } from '@/data/models';
-import type { ActivityEvent, Department, TicketStatus, Ticket } from '@/data/models';
+import type { ActivityEvent, Department, TicketStatus, Ticket, TicketType, User } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { dashboardApi, DashboardSummary } from '@/services/dashboardApi';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
+import TypeFilterPopover from '@/components/TypeFilterPopover';
+import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
 
 const statusColors: Record<TicketStatus, string> = {
   todo: '#94a3b8',
@@ -24,14 +26,21 @@ type SortKey = 'department' | 'status' | 'assignee';
 const SummaryPage = () => {
   const { setSelectedTicket } = useTickets();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { spaceId } = useParams();
   const projectId = spaceId || resolveProjectId(location.pathname);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [activityTickets, setActivityTickets] = useState<Record<string, Ticket>>({});
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
 
   const [deptFilter, setDeptFilter] = useState<Department | 'All'>('All');
   const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
   const [listStatusFilter, setListStatusFilter] = useState<TicketStatus | 'All'>('All');
+  const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
+    assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
+    unassigned: searchParams.get('unassigned') === 'true',
+  });
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [summaryRows, setSummaryRows] = useState<Ticket[]>([]);
   const [sortKey, setSortKey] = useState<SortKey>('department');
@@ -90,12 +99,26 @@ const SummaryPage = () => {
     ticketApi.getSummaryFiltered(projectId, {
       department: listDeptFilter === 'All' ? undefined : listDeptFilter,
       status: listStatusFilter === 'All' ? undefined : listStatusFilter,
+      assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
+      unassigned: assigneeFilter.unassigned,
+      types: typeFilter.length > 0 ? typeFilter : undefined,
       sortBy: sortKey === 'assignee' ? 'assignee' : sortKey,
       sortDir,
     })
       .then(setSummaryRows)
       .catch(() => setSummaryRows([]));
-  }, [projectId, listDeptFilter, listStatusFilter, sortKey, sortDir]);
+  }, [projectId, listDeptFilter, listStatusFilter, assigneeFilter, typeFilter, sortKey, sortDir]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
+    else next.delete('types');
+    if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
+    else next.delete('assigneeIds');
+    if (assigneeFilter.unassigned) next.set('unassigned', 'true');
+    else next.delete('unassigned');
+    setSearchParams(next, { replace: true });
+  }, [typeFilter, assigneeFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     fetchDashboard();
@@ -136,6 +159,13 @@ const SummaryPage = () => {
       return { ...fallback, total };
     };
 
+    const hasAssigneeFilter = assigneeFilter.assigneeIds.length > 0 || assigneeFilter.unassigned;
+    const hasTypeFilter = typeFilter.length > 0;
+    const hasListFilters = listDeptFilter !== 'All' || listStatusFilter !== 'All';
+    if (hasAssigneeFilter || hasTypeFilter || hasListFilters) {
+      return fromSummaryRows();
+    }
+
     if (dashboard) {
       const byStatus = dashboard.byStatus || {};
       const todo = Number(byStatus['todo'] || byStatus['TODO'] || 0);
@@ -149,7 +179,7 @@ const SummaryPage = () => {
       }
     }
     return fromSummaryRows();
-  }, [dashboard, summaryRows]);
+  }, [dashboard, summaryRows, assigneeFilter, typeFilter, listDeptFilter, listStatusFilter]);
 
   const stats = useMemo(() => {
     return [
@@ -169,7 +199,46 @@ const SummaryPage = () => {
   ]), [statusCounts]);
 
   const totalTickets = statusCounts.total;
-  const recentActivity = activity.slice(0, 15);
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableUsers([]);
+      return;
+    }
+    const departmentFilter = listDeptFilter !== 'All'
+      ? listDeptFilter
+      : (deptFilter !== 'All' ? deptFilter : undefined);
+    ticketApi.queryTickets(projectId, {
+      department: departmentFilter,
+      status: listStatusFilter === 'All' ? undefined : listStatusFilter,
+      types: typeFilter.length > 0 ? typeFilter : undefined,
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: 50,
+    })
+      .then((response) => {
+        const users = new Map<string, User>();
+        response.items.forEach((ticket) => {
+          ticket.assignees.forEach((assignee) => users.set(assignee.id, assignee));
+        });
+        setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+      })
+      .catch(() => setAvailableUsers([]));
+  }, [projectId, deptFilter, listDeptFilter, listStatusFilter, typeFilter]);
+
+  const recentActivity = activity
+    .filter((event) => {
+      const ticket = event.ticketId ? activityTickets[event.ticketId] : null;
+      if (!ticket) return true;
+      if (typeFilter.length > 0 && !typeFilter.includes(ticket.type)) return false;
+      if (assigneeFilter.unassigned && ticket.assignees.length === 0) return true;
+      if (assigneeFilter.assigneeIds.length > 0) {
+        return ticket.assignees.some((assignee) => assigneeFilter.assigneeIds.includes(assignee.id));
+      }
+      if (assigneeFilter.unassigned) return ticket.assignees.length === 0;
+      return true;
+    })
+    .slice(0, 15);
 
   const sortIcon = (key: SortKey) => {
     if (sortKey !== key) return '↕';
@@ -203,6 +272,8 @@ const SummaryPage = () => {
             {departments.map((d) => <option key={d} value={d}>{d}</option>)}
           </select>
         </div>
+        <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
+        <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:hidden">

@@ -38,6 +38,11 @@ const AssigneeMultiSelect = ({ users, value, onChange, label = 'Assignees', disa
     return users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
   }, [users, search]);
 
+  const selectedUsers = useMemo(
+    () => users.filter((user) => draft.includes(user.id)),
+    [users, draft],
+  );
+
   const isUnassigned = draft.length === 0;
   const selectedCount = draft.length;
 
@@ -54,7 +59,13 @@ const AssigneeMultiSelect = ({ users, value, onChange, label = 'Assignees', disa
       >
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <span>{selectedCount > 0 ? `${selectedCount} selected` : 'Unassigned'}</span>
+          <span>
+            {selectedCount === 0
+              ? 'Unassigned'
+              : selectedCount === 1
+                ? (selectedUsers[0]?.name || '1 selected')
+                : `${selectedCount} selected`}
+          </span>
         </div>
         <span className="text-xs text-muted-foreground">{open ? '▲' : '▼'}</span>
       </button>

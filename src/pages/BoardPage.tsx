@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, NavLink, useLocation } from 'react-router-dom';
+import { useParams, NavLink, useLocation, useSearchParams } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useTickets } from '@/contexts/TicketContext';
 import { TypeIcon, PriorityIcon, DeptBadge, AssigneeStack } from '@/components/TicketBadges';
@@ -13,6 +13,9 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import { toast } from '@/components/ui/sonner';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
+import TypeFilterPopover from '@/components/TypeFilterPopover';
+import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
+import type { TicketType, User } from '@/data/models';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
@@ -88,12 +91,19 @@ const TicketCard = ({
 const BoardPage = () => {
   const { spaceId, featureId } = useParams();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const projectId = spaceId || resolveProjectId(location.pathname);
+  const searchTerm = searchParams.get('search')?.trim() || '';
   const { setSelectedTicket, updateTicketStatus } = useTickets();
   const isFeatureView = Boolean(featureId);
   const [boardTickets, setBoardTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'unassigned'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
+    assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
+    unassigned: searchParams.get('unassigned') === 'true',
+  });
+  const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [settleTicketId, setSettleTicketId] = useState<string | null>(null);
   const [movingTicketId, setMovingTicketId] = useState<string | null>(null);
   const [ghostColumn, setGhostColumn] = useState<TicketStatus | null>(null);
@@ -118,6 +128,30 @@ const BoardPage = () => {
     tickets: boardTickets.filter(t => t.status === col.id && t.id !== movingTicketId),
   }));
 
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableUsers([]);
+      return;
+    }
+    ticketApi.queryTickets(projectId, {
+      featureId: featureId || undefined,
+      search: searchTerm || undefined,
+      types: typeFilter.length > 0 ? typeFilter : undefined,
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: 50,
+    })
+      .then((response) => {
+        const users = new Map<string, User>();
+        response.items.forEach((ticket) => {
+          ticket.assignees.forEach((assignee) => users.set(assignee.id, assignee));
+        });
+        setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+      })
+      .catch(() => setAvailableUsers([]));
+  }, [projectId, featureId, searchTerm, typeFilter]);
+
   const clearAnimationTimers = () => {
     timeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     timeoutsRef.current = [];
@@ -133,22 +167,41 @@ const BoardPage = () => {
       return;
     }
     setLoading(true);
+    window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: true } }));
     try {
       const response = await ticketApi.queryTickets(projectId, {
         featureId: featureId || undefined,
-        assigneeId: assigneeFilter === 'unassigned' ? 0 : undefined,
+        q: searchTerm || undefined,
+        search: searchTerm || undefined,
+        assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
+        unassigned: assigneeFilter.unassigned,
+        types: typeFilter.length > 0 ? typeFilter : undefined,
         sortBy: 'updatedAt',
         sortDir: 'desc',
         page: 0,
-        size: 500,
+        size: 50,
       });
       setBoardTickets(response.items);
     } catch {
       setBoardTickets([]);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: false } }));
     }
-  }, [projectId, featureId, assigneeFilter]);
+  }, [projectId, featureId, searchTerm, assigneeFilter, typeFilter]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
+    else next.delete('types');
+    if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
+    else next.delete('assigneeIds');
+    if (assigneeFilter.unassigned) next.set('unassigned', 'true');
+    else next.delete('unassigned');
+    if (searchTerm) next.set('search', searchTerm);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  }, [searchTerm, typeFilter, assigneeFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadBoard();
@@ -208,16 +261,8 @@ const BoardPage = () => {
           <h1 className="text-xl font-semibold">Board</h1>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAssigneeFilter((prev) => (prev === 'unassigned' ? 'all' : 'unassigned'))}
-            className={cn(
-              'h-8 px-3 rounded-md border text-xs font-medium transition-colors',
-              assigneeFilter === 'unassigned' ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'
-            )}
-          >
-            {assigneeFilter === 'unassigned' ? 'Showing Unassigned' : 'Filter Unassigned'}
-          </button>
+          <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
+          <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
         </div>
       </div>
       {loading && <div className="text-xs text-muted-foreground">Loading board...</div>}

@@ -11,6 +11,8 @@ import { featureApi, FeatureItem } from '@/services/featureApi';
 import type { User } from '@/data/models';
 import AttachmentUploader from '@/components/AttachmentUploader';
 import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
+import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
+import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
 
 interface NewTicketModalProps {
   open: boolean;
@@ -26,7 +28,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [features, setFeatures] = useState<FeatureItem[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [department, setDepartment] = useState<Department>('Website');
+  const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>(['Website']);
   const [type, setType] = useState<TicketType>('task');
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
@@ -85,12 +87,13 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
     if (!open || !projectId) return;
     featureApi.getFeatures(projectId)
       .then((rows) => {
-        setFeatures(rows);
-        if (featureId && rows.some((f) => f.id === featureId)) {
+        const sorted = [...rows].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        setFeatures(sorted);
+        if (featureId && sorted.some((f) => f.id === featureId)) {
           return;
         }
-        if (rows.length > 0) {
-          setFeatureId(rows[0].id);
+        if (sorted.length > 0) {
+          setFeatureId(sorted[0].id);
         }
       })
       .catch(() => setFeatures([]));
@@ -116,7 +119,8 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         featureId: featureId || null,
         title: title.trim(),
         description,
-        department,
+        department: departmentsDraft[0] || 'Website',
+        departments: departmentsDraft,
         type,
         priority,
         status,
@@ -127,7 +131,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       onClose();
       setTitle('');
       setDescription('');
-      setDepartment('Website');
+      setDepartmentsDraft(['Website']);
       setType('task');
       setPriority('medium');
       setAssigneeIds([]);
@@ -198,11 +202,13 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
               </select>
             </div>
             <div>
-              <label className={labelCls}>Feature</label>
               {features.length > 0 ? (
-                <select value={featureId} onChange={e => setFeatureId(e.target.value)} className={selectCls} required>
-                  {features.map(feature => <option key={feature.id} value={feature.id}>{feature.name}</option>)}
-                </select>
+                <SearchableFeatureSelect
+                  features={features}
+                  value={featureId}
+                  onChange={setFeatureId}
+                  className="w-full"
+                />
               ) : (
                 <div className="space-y-2">
                   <input
@@ -230,10 +236,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
               )}
             </div>
             <div>
-              <label className={labelCls}>Department</label>
-              <select value={department} onChange={e => setDepartment(e.target.value as Department)} className={selectCls}>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+              <DepartmentMultiSelect value={departmentsDraft} onChange={setDepartmentsDraft} />
             </div>
             <div>
               <label className={labelCls}>Type</label>

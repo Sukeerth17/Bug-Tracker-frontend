@@ -40,6 +40,7 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   department: Department;
+  departments: Department[];
   type: TicketType;
   assignee: User | null;
   assignees: User[];

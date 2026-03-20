@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft, Sun, Moon } from 'lucide-react';
+import { Search, Plus, Bell, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Loader2 } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTickets } from '@/contexts/TicketContext';
-import type { Ticket } from '@/data/models';
 import { useAuth } from '@/contexts/AuthContext';
-import { StatusBadge, DeptBadge } from '@/components/TicketBadges';
+import type { Ticket } from '@/data/models';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { notificationApi, NotificationItem } from '@/services/notificationApi';
@@ -12,6 +11,7 @@ import { ticketApi } from '@/services/ticketApi';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import { useThemeMode } from '@/hooks/useTheme';
 import { resolveProjectId } from '@/services/projectControl';
+import { DeptBadge, StatusBadge } from '@/components/TicketBadges';
 
 interface TopHeaderProps {
   sidebarCollapsed: boolean;
@@ -27,8 +27,8 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const { logout } = useAuth();
   const currentProjectId = useMemo(() => spaceId || resolveProjectId(location.pathname), [spaceId, location.pathname]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<Ticket[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -48,7 +48,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
 
   useEffect(() => {
     const openSearch = () => {
-      setSearchOpen(true);
       requestAnimationFrame(() => {
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
@@ -63,7 +62,6 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
         openSearch();
       }
       if (e.key === 'Escape') {
-        setSearchOpen(false);
         setNotifOpen(false);
         setUserMenuOpen(false);
       }
@@ -78,7 +76,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchOpen(false);
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setSearchDropdownOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (userRef.current && !userRef.current.contains(e.target as Node)) setUserMenuOpen(false);
     };
@@ -87,25 +85,56 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   }, []);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const value = params.get('search') || '';
+    setSearchQuery(value);
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ loading?: boolean }>).detail;
+      setSearchLoading(Boolean(detail?.loading));
+    };
+    window.addEventListener('ticket:context-search-loading', handler as EventListener);
+    return () => window.removeEventListener('ticket:context-search-loading', handler as EventListener);
+  }, []);
+
+  useEffect(() => {
+    const debounce = window.setTimeout(() => {
+      const trimmed = searchQuery.trim();
+      const next = new URLSearchParams(location.search);
+      if (trimmed) next.set('search', trimmed);
+      else next.delete('search');
+      const nextSearch = next.toString();
+      const currentSearch = location.search.startsWith('?') ? location.search.slice(1) : location.search;
+      if (nextSearch !== currentSearch) {
+        navigate(
+          { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' },
+          { replace: true },
+        );
+      }
+    }, 300);
+    return () => window.clearTimeout(debounce);
+  }, [searchQuery, location.pathname, location.search, navigate]);
+
+  useEffect(() => {
     if (!searchQuery.trim() || !currentProjectId) {
       setSearchResults([]);
-      setSearchLoading(false);
       return;
     }
-    setSearchLoading(true);
-    const handler = setTimeout(() => {
+    const debounce = window.setTimeout(() => {
       ticketApi.queryTickets(currentProjectId, {
         q: searchQuery.trim(),
+        search: searchQuery.trim(),
         sortBy: 'updatedAt',
         sortDir: 'desc',
         page: 0,
-        size: 20,
+        size: 10,
       })
         .then((res) => setSearchResults(res.items))
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearchLoading(false));
+        .catch(() => setSearchResults([]));
     }, 300);
-    return () => clearTimeout(handler);
+    return () => window.clearTimeout(debounce);
   }, [searchQuery, currentProjectId]);
 
   useEffect(() => {
@@ -161,7 +190,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   const markAllNotificationsRead = async () => {
     if (unreadNotifications.length === 0) return;
     const unreadIds = unreadNotifications.map((notification) => notification.id);
-    await Promise.all(unreadIds.map((id) => notificationApi.markRead(id)));
+    await notificationApi.markAllRead();
     setNotifications((prev) => prev.filter((item) => !unreadIds.includes(item.id)));
     setUnreadCount(0);
   };
@@ -169,14 +198,7 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
   useEffect(() => {
     if (!notifOpen) return;
     if (unreadNotifications.length === 0) return;
-    const unreadIds = unreadNotifications.map((n) => n.id);
-    Promise.all(unreadIds.map((id) => notificationApi.markRead(id)))
-      .then((updatedList) => {
-        setNotifications((prev) =>
-          prev.map((item) => updatedList.find((u) => u.id === item.id) ?? item)
-        );
-        setUnreadCount(0);
-      })
+    markAllNotificationsRead()
       .catch(() => {
         // ignore read failures
       });
@@ -198,40 +220,47 @@ const TopHeader = ({ sidebarCollapsed, onToggleSidebar, onNewTicket }: TopHeader
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search tickets..."
+            placeholder="Search tickets by title..."
             value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-            onFocus={() => setSearchOpen(true)}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchDropdownOpen(true)}
             ref={searchInputRef}
-            className="w-full h-9 pl-9 pr-16 rounded-lg bg-muted/60 border-0 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            className="w-full h-9 pl-9 pr-20 rounded-lg bg-muted/60 border-0 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
           />
+          {searchLoading && (
+            <Loader2 className="absolute right-12 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
+          )}
           <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground bg-background border rounded px-1.5 py-0.5">
             {isMac ? '⌘K' : 'Ctrl K'}
           </kbd>
         </div>
-
-        {searchOpen && searchQuery.trim() && (
+        {searchDropdownOpen && searchQuery.trim() && (
           <div className="absolute top-full left-0 right-0 mt-1 bg-card border rounded-lg shadow-xl max-h-80 overflow-y-auto z-50">
             {searchLoading ? (
               <p className="text-sm text-muted-foreground text-center py-6">Searching...</p>
             ) : searchResults.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No results found.</p>
+              <p className="text-sm text-muted-foreground text-center py-6">No tickets found.</p>
             ) : (
-              searchResults.map((t) => (
+              searchResults.map((ticket) => (
                 <button
-                  key={t.id}
-                  onClick={() => {
-                    setSelectedTicket(t);
-                    setSearchOpen(false);
-                    setSearchQuery('');
-                    navigate(`/space/${currentProjectId}/list`);
+                  key={ticket.id}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSelectedTicket(ticket);
+                    setSearchDropdownOpen(false);
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-accent/50 transition-colors text-left border-b last:border-b-0"
                 >
-                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">{t.id}</span>
-                  <span className="text-sm truncate flex-1">{t.title}</span>
-                  <StatusBadge status={t.status} />
-                  <DeptBadge department={t.department} />
+                  <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded text-muted-foreground shrink-0">{ticket.id}</span>
+                  <span className="text-sm truncate flex-1">{ticket.title}</span>
+                  <StatusBadge status={ticket.status} />
+                  <DeptBadge department={ticket.department} />
                 </button>
               ))
             )}

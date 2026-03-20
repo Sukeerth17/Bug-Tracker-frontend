@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { X, Tag } from 'lucide-react';
-import { Department, Ticket, TicketPriority, TicketStatus, TicketType, priorityLabels, statusLabels, typeLabels, departments } from '@/data/models';
+import { X } from 'lucide-react';
+import { Department, Ticket, TicketPriority, TicketStatus, TicketType, priorityLabels, statusLabels, typeLabels } from '@/data/models';
 import { featureApi, FeatureItem } from '@/services/featureApi';
 import { ticketApi } from '@/services/ticketApi';
 import { useTickets } from '@/contexts/TicketContext';
 import AttachmentUploader from '@/components/AttachmentUploader';
 import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 import { format } from 'date-fns';
+import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
+import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
+import UnsavedChangesBadge from '@/components/UnsavedChangesBadge';
 
 interface EditTicketModalProps {
   open: boolean;
@@ -21,14 +24,13 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<TicketStatus>('todo');
   const [priority, setPriority] = useState<TicketPriority>('medium');
-  const [department, setDepartment] = useState<Department>('Website');
+  const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>(['Website']);
   const [type, setType] = useState<TicketType>('task');
   const [dueDate, setDueDate] = useState('');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<string[]>([]);
   const [availableUsers, setAvailableUsers] = useState<Ticket['assignees']>([]);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
-  const [featureSearch, setFeatureSearch] = useState('');
   const [selectedFeatures, setSelectedFeatures] = useState<FeatureItem[]>([]);
   const [saving, setSaving] = useState(false);
 
@@ -38,7 +40,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
     setDescription(ticket.description || '');
     setStatus(ticket.status);
     setPriority(ticket.priority);
-    setDepartment(ticket.department);
+    setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setType(ticket.type);
     setDueDate(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setAssigneeIds(ticket.assignees.map((a) => a.id));
@@ -53,7 +55,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
   useEffect(() => {
     if (!open || !projectId) return;
     featureApi.getFeatures(projectId)
-      .then(setFeatures)
+      .then((rows) => setFeatures([...rows].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))))
       .catch(() => setFeatures([]));
   }, [open, projectId]);
 
@@ -66,10 +68,6 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
 
   if (!open || !ticket) return null;
 
-  const filteredFeatures = featureSearch.trim()
-    ? features.filter((f) => f.name.toLowerCase().includes(featureSearch.trim().toLowerCase()))
-    : features;
-
   const lastEdit = useMemo(() => {
     if (ticket.activity && ticket.activity.length > 0) {
       const latest = [...ticket.activity].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
@@ -77,6 +75,24 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
     }
     return { name: ticket.reporter?.name || 'Unknown', at: ticket.updatedAt };
   }, [ticket]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!ticket) return false;
+    const savedDepartments = [...(ticket.departments?.length ? ticket.departments : [ticket.department])].sort();
+    const draftDepartments = [...departmentsDraft].sort();
+    return (
+      title !== ticket.title
+      || description !== (ticket.description || '')
+      || status !== ticket.status
+      || priority !== ticket.priority
+      || type !== ticket.type
+      || dueDate !== (ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '')
+      || savedDepartments.join(',') !== draftDepartments.join(',')
+      || assigneeIds.slice().sort().join(',') !== ticket.assignees.map((a) => a.id).sort().join(',')
+      || attachments.join(',') !== (ticket.attachments || []).join(',')
+      || (selectedFeatures[0]?.id || '') !== (ticket.featureId ? String(ticket.featureId) : '')
+    );
+  }, [ticket, title, description, status, priority, type, dueDate, departmentsDraft, assigneeIds, attachments, selectedFeatures]);
 
   const handleSave = async () => {
     if (!projectId) return;
@@ -87,7 +103,8 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
         description,
         dueDate: dueDate || null,
         priority,
-        department,
+        department: departmentsDraft[0] || 'Website',
+        departmentIds: departmentsDraft,
         type,
         featureId: selectedFeatures[0]?.id ? Number(selectedFeatures[0].id) : null,
       });
@@ -118,7 +135,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
     setDescription(ticket.description || '');
     setStatus(ticket.status);
     setPriority(ticket.priority);
-    setDepartment(ticket.department);
+    setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setType(ticket.type);
     setDueDate(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setAssigneeIds(ticket.assignees.map((a) => a.id));
@@ -171,12 +188,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-muted-foreground">Department</label>
-              <select value={department} onChange={(e) => setDepartment(e.target.value as Department)} className="h-10 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full">
-                {departments.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <DepartmentMultiSelect value={departmentsDraft} onChange={setDepartmentsDraft} />
             </div>
 
             <div>
@@ -201,50 +213,15 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground">Features / Tags</label>
-            <div className="rounded-xl border bg-card p-3">
-              <div className="flex flex-wrap gap-2 mb-2">
-                {selectedFeatures.length === 0 && (
-                  <span className="text-xs text-muted-foreground">No features selected</span>
-                )}
-                {selectedFeatures.map((feature) => (
-                  <span key={feature.id} className="inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-xs">
-                    <Tag className="h-3 w-3" />
-                    {feature.name}
-                    <button type="button" onClick={() => setSelectedFeatures((prev) => prev.filter((f) => f.id !== feature.id))} className="text-muted-foreground hover:text-foreground">×</button>
-                  </span>
-                ))}
-              </div>
-              <input
-                value={featureSearch}
-                onChange={(e) => setFeatureSearch(e.target.value)}
-                placeholder="Add feature tags..."
-                className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              {featureSearch && (
-                <div className="mt-2 max-h-40 overflow-y-auto rounded-md border bg-background">
-                  {filteredFeatures.map((feature) => (
-                    <button
-                      key={feature.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedFeatures((prev) => {
-                          if (prev.some((f) => f.id === feature.id)) return prev;
-                          return [...prev, feature];
-                        });
-                        setFeatureSearch('');
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent"
-                    >
-                      {feature.name}
-                    </button>
-                  ))}
-                  {filteredFeatures.length === 0 && (
-                    <p className="px-3 py-2 text-xs text-muted-foreground">No matching features.</p>
-                  )}
-                </div>
-              )}
-            </div>
+            <SearchableFeatureSelect
+              label="Feature"
+              features={features}
+              value={selectedFeatures[0]?.id || ''}
+              onChange={(nextId) => {
+                const next = features.find((feature) => feature.id === nextId);
+                setSelectedFeatures(next ? [next] : []);
+              }}
+            />
           </div>
 
           <AssigneeMultiSelect users={availableUsers} value={assigneeIds} onChange={setAssigneeIds} />
@@ -264,8 +241,9 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
             Last edited by <span className="font-semibold text-foreground">{lastEdit.name}</span> · {format(new Date(lastEdit.at), 'PPpp')}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={handleDiscard} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors">Discard Changes</button>
-            <button type="button" onClick={handleSave} disabled={saving} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">{saving ? 'Saving…' : 'Save'}</button>
+            <UnsavedChangesBadge visible={hasUnsavedChanges} />
+            <button type="button" onClick={handleDiscard} disabled={!hasUnsavedChanges} className="h-9 px-4 rounded-lg border text-sm font-medium hover:bg-accent transition-colors disabled:opacity-60">Discard Changes</button>
+            <button type="button" onClick={handleSave} disabled={saving || !hasUnsavedChanges} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">{saving ? 'Saving…' : 'Save'}</button>
           </div>
         </div>
       </div>

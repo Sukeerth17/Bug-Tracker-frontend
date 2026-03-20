@@ -3,34 +3,41 @@ import { useTickets } from '@/contexts/TicketContext';
 import { PriorityIcon, TypeIcon, UserAvatar, StatusBadge, AssigneeStack } from '@/components/TicketBadges';
 import TicketMenu from '@/components/TicketMenu';
 import { priorityLabels, statusLabels, Ticket } from '@/data/models';
-import type { TicketPriority, TicketStatus } from '@/data/models';
+import type { TicketPriority, TicketStatus, TicketType, User } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download, Paperclip } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { NavLink, useLocation, useParams } from 'react-router-dom';
+import { NavLink, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
+import TypeFilterPopover from '@/components/TypeFilterPopover';
+import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
 
-type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'dueDate';
+type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'dueDate' | 'assignee';
 
 const ListPage = () => {
   const { setSelectedTicket } = useTickets();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { spaceId, featureId } = useParams();
   const projectId = spaceId || resolveProjectId(location.pathname);
+  const contextSearch = searchParams.get('search')?.trim() || '';
   const isFeatureView = Boolean(featureId);
 
   const [rows, setRows] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | TicketStatus>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | TicketPriority>('all');
-  const [assigneeFilter, setAssigneeFilter] = useState<'all' | 'unassigned'>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
+    assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
+    unassigned: searchParams.get('unassigned') === 'true',
+  });
+  const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -46,13 +53,17 @@ const ListPage = () => {
     }
 
     setLoading(true);
+    window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: true } }));
     try {
       const response = await ticketApi.queryTickets(projectId, {
         featureId: featureId || undefined,
-        q: search.trim() || undefined,
+        q: contextSearch || undefined,
+        search: contextSearch || undefined,
         status: statusFilter === 'all' ? undefined : statusFilter,
         priority: priorityFilter === 'all' ? undefined : priorityFilter,
-        assigneeId: assigneeFilter === 'unassigned' ? 0 : undefined,
+        assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
+        unassigned: assigneeFilter.unassigned,
+        types: typeFilter.length > 0 ? typeFilter : undefined,
         sortBy: sortKey,
         sortDir: sortAsc ? 'asc' : 'desc',
         page,
@@ -68,8 +79,52 @@ const ListPage = () => {
       setTotalPages(1);
     } finally {
       setLoading(false);
+      window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: false } }));
     }
-  }, [projectId, featureId, search, statusFilter, priorityFilter, assigneeFilter, sortKey, sortAsc, page, pageSize]);
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, assigneeFilter, typeFilter, sortKey, sortAsc, page, pageSize]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setAvailableUsers([]);
+      return;
+    }
+    ticketApi.queryTickets(projectId, {
+      featureId: featureId || undefined,
+      search: contextSearch || undefined,
+      status: statusFilter === 'all' ? undefined : statusFilter,
+      priority: priorityFilter === 'all' ? undefined : priorityFilter,
+      types: typeFilter.length > 0 ? typeFilter : undefined,
+      sortBy: sortKey,
+      sortDir: sortAsc ? 'asc' : 'desc',
+      page: 0,
+      size: 50,
+    })
+      .then((response) => {
+        const users = new Map<string, User>();
+        response.items.forEach((ticket) => {
+          ticket.assignees.forEach((assignee) => users.set(assignee.id, assignee));
+        });
+        setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+      })
+      .catch(() => setAvailableUsers([]));
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, typeFilter, sortKey, sortAsc]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [contextSearch]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
+    else next.delete('types');
+    if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
+    else next.delete('assigneeIds');
+    if (assigneeFilter.unassigned) next.set('unassigned', 'true');
+    else next.delete('unassigned');
+    if (contextSearch) next.set('search', contextSearch);
+    else next.delete('search');
+    setSearchParams(next, { replace: true });
+  }, [contextSearch, typeFilter, assigneeFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadTickets();
@@ -84,14 +139,6 @@ const ListPage = () => {
       window.removeEventListener('ticket:updated', handler as EventListener);
     };
   }, [loadTickets]);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setSearch(searchInput);
-      setPage(0);
-    }, 300);
-    return () => clearTimeout(handler);
-  }, [searchInput]);
 
   const toggleSort = (key: SortKey) => {
     setPage(0);
@@ -178,14 +225,9 @@ const ListPage = () => {
             <Plus className="h-3.5 w-3.5" />
             Create
           </button>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Filter tickets..."
-              className="h-8 w-56 pl-8 pr-3 rounded-md border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
-            />
+          <div className="h-8 rounded-md border bg-muted/40 px-3 text-xs text-muted-foreground inline-flex items-center gap-1.5">
+            <Search className="h-3.5 w-3.5" />
+            Header search active
           </div>
           {loading && <span className="text-xs text-muted-foreground">Loading...</span>}
           <select
@@ -214,17 +256,14 @@ const ListPage = () => {
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
-          <select
-            value={assigneeFilter}
-            onChange={(e) => {
-              setAssigneeFilter(e.target.value as 'all' | 'unassigned');
-              setPage(0);
-            }}
-            className="h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
-          >
-            <option value="all">All Assignees</option>
-            <option value="unassigned">Unassigned</option>
-          </select>
+          <TypeFilterPopover value={typeFilter} onApply={(next) => {
+            setTypeFilter(next);
+            setPage(0);
+          }} />
+          <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={(next) => {
+            setAssigneeFilter(next);
+            setPage(0);
+          }} />
         </div>
       </div>
 
@@ -242,7 +281,7 @@ const ListPage = () => {
                   />
                 </th>
                 <th className={thCls} onClick={() => toggleSort('title')}>Work {sortIcon('title')}</th>
-                <th className={thCls}>Assignee</th>
+                <th className={thCls} onClick={() => toggleSort('assignee')}>Assignees {sortIcon('assignee')}</th>
                 <th className={thCls}>Reporter</th>
                 <th className={thCls} onClick={() => toggleSort('status')}>Status {sortIcon('status')}</th>
                 <th className={thCls} onClick={() => toggleSort('priority')}>Priority {sortIcon('priority')}</th>

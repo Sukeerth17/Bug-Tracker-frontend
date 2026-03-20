@@ -39,6 +39,7 @@ interface ApiTicket {
   status: Ticket['status'];
   priority: Ticket['priority'];
   department: Ticket['department'];
+  departments?: Ticket['departments'];
   type: Ticket['type'];
   assignee: ApiUser | null;
   assignees?: ApiUser[];
@@ -63,10 +64,15 @@ interface ApiPage<T> {
 
 export interface TicketQueryParams {
   q?: string;
+  search?: string;
   status?: Ticket['status'];
   priority?: Ticket['priority'];
+  department?: string;
   assigneeId?: number;
+  assigneeIds?: number[];
+  unassigned?: boolean;
   featureId?: string | number;
+  types?: Ticket['type'][];
   createdFrom?: string;
   createdTo?: string;
   updatedFrom?: string;
@@ -134,6 +140,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
     status: ticket.status,
     priority: ticket.priority,
     department: ticket.department,
+    departments: ticket.departments && ticket.departments.length > 0 ? ticket.departments : [ticket.department],
     type: ticket.type,
     assignee: mappedPrimaryAssignee,
     assignees: mappedAssignees,
@@ -185,7 +192,7 @@ export const ticketApi = {
 
   async getTickets(projectId: string, featureId?: string | number | null): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[] | ApiPage<ApiTicket>>(API_ENDPOINTS.tickets, {
-      params: { projectId, featureId: featureId ?? undefined, page: 0, size: 500 },
+      params: { projectId, featureId: featureId ?? undefined, page: 0, size: 50 },
     });
     const rows = Array.isArray(response.data) ? response.data : response.data.items || [];
     return rows.map(mapTicket);
@@ -209,17 +216,17 @@ export const ticketApi = {
     return response.data.map(mapTicket);
   },
 
-  async getSummaryFiltered(projectId: string, params: { department?: string; status?: string; sortBy?: string; sortDir?: string }): Promise<Ticket[]> {
+  async getSummaryFiltered(projectId: string, params: { department?: string; status?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string }): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary, { params: { projectId, ...params } });
     return response.data.map(mapTicket);
   },
 
-  async getRecent(params: { projectId?: string; featureId?: string | number; department?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+  async getRecent(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/recent`, { params });
     return response.data.map(mapTicket);
   },
 
-  async getForYou(params: { projectId?: string; featureId?: string | number; department?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+  async getForYou(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/for-you`, { params });
     return response.data.map(mapTicket);
   },
@@ -244,6 +251,7 @@ export const ticketApi = {
     status: Ticket['status'];
     priority: Ticket['priority'];
     department: Ticket['department'];
+    departmentIds?: Ticket['department'][];
     type: Ticket['type'];
     assigneeIds: number[];
     reporterId: number;
@@ -272,7 +280,7 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
-  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null; priority?: Ticket['priority']; department?: Ticket['department']; type?: Ticket['type']; featureId?: string | number | null }): Promise<Ticket> {
+  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null; priority?: Ticket['priority']; department?: Ticket['department']; departmentIds?: Ticket['department'][]; type?: Ticket['type']; featureId?: string | number | null }): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketDetails.replace('{ticketId}', ticketId),
       payload,

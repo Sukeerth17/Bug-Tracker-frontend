@@ -10,8 +10,8 @@ export interface FeatureItem {
 }
 
 export const featureApi = {
-  async getFeatures(projectId: string): Promise<FeatureItem[]> {
-    const response = await api.get<FeatureItem[]>(API_ENDPOINTS.features, { params: { projectId } });
+  async getFeatures(projectId: string, q?: string): Promise<FeatureItem[]> {
+    const response = await api.get<FeatureItem[]>(API_ENDPOINTS.features, { params: { projectId, q: q || undefined } });
     return response.data.map((row) => ({ ...row, id: String(row.id) }));
   },
 

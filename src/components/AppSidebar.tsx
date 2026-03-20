@@ -24,6 +24,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const [projects, setProjects] = React.useState<ProjectItem[]>([]);
   const [expandedProjects, setExpandedProjects] = React.useState<Set<string>>(new Set());
   const [featuresByProject, setFeaturesByProject] = React.useState<Record<string, FeatureItem[]>>({});
+  const [featureSearchByProject, setFeatureSearchByProject] = React.useState<Record<string, string>>({});
   const [expandedFeatureSections, setExpandedFeatureSections] = React.useState<Set<string>>(new Set());
   const [expandedFeatures, setExpandedFeatures] = React.useState<Set<string>>(new Set());
   const [creatingForProject, setCreatingForProject] = React.useState<string | null>(null);
@@ -59,10 +60,36 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       }))
     ).then((rows) => {
       const next: Record<string, FeatureItem[]> = {};
-      rows.forEach((row) => { next[row.projectId] = row.features; });
+      rows.forEach((row) => {
+        next[row.projectId] = [...row.features].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      });
       setFeaturesByProject(next);
     });
   }, [projects]);
+
+  React.useEffect(() => {
+    const activeProjects = projects.filter((project) => expandedFeatureSections.has(project.id));
+    if (activeProjects.length === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      Promise.all(
+        activeProjects.map(async (project) => ({
+          projectId: project.id,
+          features: await featureApi.getFeatures(project.id, featureSearchByProject[project.id] || '').catch(() => []),
+        }))
+      ).then((rows) => {
+        setFeaturesByProject((prev) => {
+          const next = { ...prev };
+          rows.forEach((row) => {
+            next[row.projectId] = [...row.features].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+          });
+          return next;
+        });
+      });
+    }, 250);
+
+    return () => window.clearTimeout(timeout);
+  }, [projects, expandedFeatureSections, featureSearchByProject]);
 
   React.useEffect(() => {
     const projectId = getProjectIdFromPathname(location.pathname);
@@ -122,10 +149,11 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       setCreatingForProject(null);
       return;
     }
-    const created = await featureApi.createFeature(projectId, name);
+    await featureApi.createFeature(projectId, name);
+    const refreshed = await featureApi.getFeatures(projectId, featureSearchByProject[projectId] || '');
     setFeaturesByProject((prev) => ({
       ...prev,
-      [projectId]: [created, ...(prev[projectId] || [])],
+      [projectId]: [...refreshed].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     }));
     setNewFeatureName('');
     setCreatingForProject(null);
@@ -142,9 +170,10 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
     if (!pendingDelete) return;
     const { projectId, featureId } = pendingDelete;
     await featureApi.deleteFeature(projectId, featureId);
+    const refreshed = await featureApi.getFeatures(projectId, featureSearchByProject[projectId] || '');
     setFeaturesByProject((prev) => ({
       ...prev,
-      [projectId]: (prev[projectId] || []).filter((f) => f.id !== featureId),
+      [projectId]: [...refreshed].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
     }));
     setConfirmDeleteOpen(false);
     setPendingDelete(null);
@@ -286,6 +315,14 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                           </div>
                           {expandedFeatureSections.has(project.id) && (
                             <div className="ml-2 space-y-1">
+                              <div className="px-2">
+                                <input
+                                  value={featureSearchByProject[project.id] || ''}
+                                  onChange={(e) => setFeatureSearchByProject((prev) => ({ ...prev, [project.id]: e.target.value }))}
+                                  placeholder="Search features..."
+                                  className="h-7 w-full rounded-md border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground"
+                                />
+                              </div>
                               {creatingForProject === project.id && (
                                 <div className="flex items-center gap-1 px-2">
                                   <input

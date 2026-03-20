@@ -1,19 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTickets } from '@/contexts/TicketContext';
 import { StatusBadge, PriorityIcon, TypeIcon, DeptBadge } from '@/components/TicketBadges';
-import { Ticket, Department, departments } from '@/data/models';
+import { Ticket, Department, departments, TicketType, User } from '@/data/models';
 import { ticketApi } from '@/services/ticketApi';
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { featureApi, FeatureItem } from '@/services/featureApi';
+import { useSearchParams } from 'react-router-dom';
+import TypeFilterPopover from '@/components/TypeFilterPopover';
+import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
 
 const ForYouPage = () => {
   const { setSelectedTicket } = useTickets();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [featureFilter, setFeatureFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<Department | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
+    assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
+    unassigned: searchParams.get('unassigned') === 'true',
+  });
   const [sortBy, setSortBy] = useState<'updatedAt' | 'createdAt' | 'projectId' | 'department' | 'featureId'>('updatedAt');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -40,23 +50,58 @@ const ForYouPage = () => {
   }, [projects]);
 
   useEffect(() => {
-    const params: { projectId?: string; featureId?: string; department?: string; sortBy?: string; sortDir?: string } = {
+    const params: { projectId?: string; featureId?: string; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: TicketType[]; sortBy?: string; sortDir?: string } = {
       sortBy,
       sortDir,
     };
     if (projectFilter !== 'all') params.projectId = projectFilter;
     if (featureFilter !== 'all') params.featureId = featureFilter;
     if (departmentFilter !== 'all') params.department = departmentFilter;
+    if (typeFilter.length > 0) params.types = typeFilter;
+    if (assigneeFilter.assigneeIds.length > 0) params.assigneeIds = assigneeFilter.assigneeIds.map(Number);
+    if (assigneeFilter.unassigned) params.unassigned = true;
 
     ticketApi.getForYou(params)
       .then((res) => setMyTickets(res))
       .catch(() => setMyTickets([]));
-  }, [projectFilter, featureFilter, departmentFilter, sortBy, sortDir]);
+  }, [projectFilter, featureFilter, departmentFilter, typeFilter, assigneeFilter, sortBy, sortDir]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
+    else next.delete('types');
+    if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
+    else next.delete('assigneeIds');
+    if (assigneeFilter.unassigned) next.set('unassigned', 'true');
+    else next.delete('unassigned');
+    setSearchParams(next, { replace: true });
+  }, [typeFilter, assigneeFilter, searchParams, setSearchParams]);
 
   const filteredFeatures = useMemo(() => {
     if (projectFilter === 'all') return [];
     return features.filter((feature) => feature.projectId === projectFilter);
   }, [features, projectFilter]);
+
+  useEffect(() => {
+    const params: { projectId?: string; featureId?: string; department?: string; types?: TicketType[]; sortBy?: string; sortDir?: string } = {
+      sortBy,
+      sortDir,
+    };
+    if (projectFilter !== 'all') params.projectId = projectFilter;
+    if (featureFilter !== 'all') params.featureId = featureFilter;
+    if (departmentFilter !== 'all') params.department = departmentFilter;
+    if (typeFilter.length > 0) params.types = typeFilter;
+
+    ticketApi.getForYou(params)
+      .then((rows) => {
+        const users = new Map<string, User>();
+        rows.forEach((ticket) => {
+          ticket.assignees.forEach((assignee) => users.set(assignee.id, assignee));
+        });
+        setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
+      })
+      .catch(() => setAvailableUsers([]));
+  }, [projectFilter, featureFilter, departmentFilter, typeFilter, sortBy, sortDir]);
 
   useEffect(() => {
     if (projectFilter === 'all') {
@@ -67,6 +112,18 @@ const ForYouPage = () => {
     if (filteredFeatures.some((f) => f.id === featureFilter)) return;
     setFeatureFilter('all');
   }, [filteredFeatures, featureFilter, projectFilter]);
+
+  const sortedMyTickets = useMemo(() => {
+    const rows = [...myTickets];
+    if (sortBy === 'updatedAt' || sortBy === 'createdAt') {
+      rows.sort((a, b) => {
+        const left = new Date(a[sortBy]).getTime();
+        const right = new Date(b[sortBy]).getTime();
+        return sortDir === 'asc' ? left - right : right - left;
+      });
+    }
+    return rows;
+  }, [myTickets, sortBy, sortDir]);
 
   return (
     <div className="p-6 space-y-4 max-w-5xl mx-auto">
@@ -106,6 +163,8 @@ const ForYouPage = () => {
             <option key={dept} value={dept}>{dept}</option>
           ))}
         </select>
+        <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
+        <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
@@ -122,12 +181,12 @@ const ForYouPage = () => {
           onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}
           className="h-8 rounded-md border bg-background px-2 text-xs"
         >
-          <option value="desc">Desc</option>
-          <option value="asc">Asc</option>
+          <option value="desc">Newest First</option>
+          <option value="asc">Oldest First</option>
         </select>
       </div>
       <div className="space-y-2">
-        {myTickets.map((ticket) => (
+        {sortedMyTickets.map((ticket) => (
           <button
             key={ticket.id}
             onClick={() => setSelectedTicket(ticket)}
