@@ -13,6 +13,7 @@ import AttachmentUploader from '@/components/AttachmentUploader';
 import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
 import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
+import TerraformSelect from '@/components/TerraformSelect';
 
 interface NewTicketModalProps {
   open: boolean;
@@ -30,6 +31,8 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [description, setDescription] = useState('');
   const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>(['Website']);
   const [type, setType] = useState<TicketType>('task');
+  const [terraform, setTerraform] = useState('');
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [status, setStatus] = useState<TicketStatus>(defaultStatus);
@@ -98,6 +101,13 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       })
       .catch(() => setFeatures([]));
   }, [open, projectId]);
+
+  React.useEffect(() => {
+    if (!open || !projectId) return;
+    ticketApi.getTerraformOptions(projectId)
+      .then((rows) => setTerraformOptions(rows))
+      .catch(() => setTerraformOptions([]));
+  }, [open, projectId]);
   React.useEffect(() => {
     if (!open) return;
     setNewFeatureName('');
@@ -122,6 +132,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
         department: departmentsDraft[0] || 'Website',
         departments: departmentsDraft,
         type,
+        terraform: terraform || null,
         priority,
         status,
         assignees: availableUsers.filter((user) => assigneeIds.includes(user.id)),
@@ -133,6 +144,7 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setDescription('');
       setDepartmentsDraft(['Website']);
       setType('task');
+      setTerraform('');
       setPriority('medium');
       setAssigneeIds([]);
       setStatus('todo');
@@ -243,6 +255,15 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
               <select value={type} onChange={e => setType(e.target.value as TicketType)} className={selectCls}>
                 {(Object.entries(typeLabels)).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
+            </div>
+            <div>
+              <TerraformSelect
+                value={terraform}
+                options={terraformOptions}
+                onChange={setTerraform}
+                onCreate={(next) => setTerraformOptions((prev) => (prev.includes(next) ? prev : [...prev, next]))}
+                selectClassName={selectCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Priority</label>

@@ -13,6 +13,7 @@ import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
+import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 const statusColors: Record<TicketStatus, string> = {
   todo: '#94a3b8',
@@ -21,7 +22,7 @@ const statusColors: Record<TicketStatus, string> = {
   done: '#22c55e',
 };
 
-type SortKey = 'department' | 'status' | 'assignee';
+type TicketLimitOption = '10' | '20' | '30' | '40' | '50';
 
 const SummaryPage = () => {
   const { setSelectedTicket } = useTickets();
@@ -37,14 +38,35 @@ const SummaryPage = () => {
   const [listDeptFilter, setListDeptFilter] = useState<Department | 'All'>('All');
   const [listStatusFilter, setListStatusFilter] = useState<TicketStatus | 'All'>('All');
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
     assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
     unassigned: searchParams.get('unassigned') === 'true',
   });
   const [dashboard, setDashboard] = useState<DashboardSummary | null>(null);
   const [summaryRows, setSummaryRows] = useState<Ticket[]>([]);
-  const [sortKey, setSortKey] = useState<SortKey>('department');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [recentLimitOption, setRecentLimitOption] = useState<TicketLimitOption>('10');
+  const [recentCustomLimit, setRecentCustomLimit] = useState<string>('');
+  const [summaryLimitOption, setSummaryLimitOption] = useState<TicketLimitOption>('10');
+  const [summaryCustomLimit, setSummaryCustomLimit] = useState<string>('');
+
+  const resolveLimit = useCallback((preset: TicketLimitOption, customValue: string) => {
+    const parsed = Number.parseInt(customValue, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+    return Number(preset);
+  }, []);
+
+  const effectiveRecentLimit = useMemo(
+    () => resolveLimit(recentLimitOption, recentCustomLimit),
+    [recentLimitOption, recentCustomLimit, resolveLimit],
+  );
+  const effectiveSummaryLimit = useMemo(
+    () => resolveLimit(summaryLimitOption, summaryCustomLimit),
+    [summaryLimitOption, summaryCustomLimit, resolveLimit],
+  );
 
   const fetchDashboard = useCallback(() => {
     if (!projectId) {
@@ -65,10 +87,10 @@ const SummaryPage = () => {
       setActivityTickets({});
       return;
     }
-    ticketApi.getActivity(projectId)
+    ticketApi.getActivity(projectId, effectiveRecentLimit, terraformFilter !== 'all' ? terraformFilter : undefined)
       .then(setActivity)
       .catch(() => setActivity([]));
-  }, [projectId]);
+  }, [projectId, effectiveRecentLimit, terraformFilter]);
 
   useEffect(() => {
     if (!projectId || activity.length === 0) {
@@ -96,18 +118,21 @@ const SummaryPage = () => {
       setSummaryRows([]);
       return;
     }
-    ticketApi.getSummaryFiltered(projectId, {
+    ticketApi.queryTickets(projectId, {
       department: listDeptFilter === 'All' ? undefined : listDeptFilter,
       status: listStatusFilter === 'All' ? undefined : listStatusFilter,
       assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
       unassigned: assigneeFilter.unassigned,
       types: typeFilter.length > 0 ? typeFilter : undefined,
-      sortBy: sortKey === 'assignee' ? 'assignee' : sortKey,
-      sortDir,
+      terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: effectiveSummaryLimit,
     })
-      .then(setSummaryRows)
+      .then((response) => setSummaryRows(response.items))
       .catch(() => setSummaryRows([]));
-  }, [projectId, listDeptFilter, listStatusFilter, assigneeFilter, typeFilter, sortKey, sortDir]);
+  }, [projectId, listDeptFilter, listStatusFilter, assigneeFilter, typeFilter, terraformFilter, effectiveSummaryLimit]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams);
@@ -117,8 +142,10 @@ const SummaryPage = () => {
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
     else next.delete('unassigned');
+    if (terraformFilter !== 'all') next.set('terraform', terraformFilter);
+    else next.delete('terraform');
     setSearchParams(next, { replace: true });
-  }, [typeFilter, assigneeFilter, searchParams, setSearchParams]);
+  }, [typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     fetchDashboard();
@@ -211,6 +238,7 @@ const SummaryPage = () => {
       department: departmentFilter,
       status: listStatusFilter === 'All' ? undefined : listStatusFilter,
       types: typeFilter.length > 0 ? typeFilter : undefined,
+      terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
       sortBy: 'updatedAt',
       sortDir: 'desc',
       page: 0,
@@ -224,35 +252,46 @@ const SummaryPage = () => {
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
       .catch(() => setAvailableUsers([]));
-  }, [projectId, deptFilter, listDeptFilter, listStatusFilter, typeFilter]);
+  }, [projectId, deptFilter, listDeptFilter, listStatusFilter, typeFilter, terraformFilter]);
 
-  const recentActivity = activity
-    .filter((event) => {
+  useEffect(() => {
+    if (!projectId) {
+      setTerraformOptions([]);
+      return;
+    }
+    ticketApi.getTerraformOptions(projectId)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
+  }, [projectId]);
+
+  const recentActivity = useMemo(() => {
+    const filtered = activity.filter((event) => {
       const ticket = event.ticketId ? activityTickets[event.ticketId] : null;
       if (!ticket) return true;
       if (typeFilter.length > 0 && !typeFilter.includes(ticket.type)) return false;
+      if (terraformFilter !== 'all' && (ticket.terraform || '') !== terraformFilter) return false;
       if (assigneeFilter.unassigned && ticket.assignees.length === 0) return true;
       if (assigneeFilter.assigneeIds.length > 0) {
         return ticket.assignees.some((assignee) => assigneeFilter.assigneeIds.includes(assignee.id));
       }
       if (assigneeFilter.unassigned) return ticket.assignees.length === 0;
       return true;
-    })
-    .slice(0, 15);
+    });
 
-  const sortIcon = (key: SortKey) => {
-    if (sortKey !== key) return '↕';
-    return sortDir === 'asc' ? '↑' : '↓';
-  };
+    return filtered
+      .sort((a, b) => {
+        const aTicket = a.ticketId ? activityTickets[a.ticketId] : undefined;
+        const bTicket = b.ticketId ? activityTickets[b.ticketId] : undefined;
+        const aTime = aTicket ? Date.parse(aTicket.updatedAt) : Date.parse(a.createdAt);
+        const bTime = bTicket ? Date.parse(bTicket.updatedAt) : Date.parse(b.createdAt);
+        return bTime - aTime;
+      })
+      .slice(0, effectiveRecentLimit);
+  }, [activity, activityTickets, assigneeFilter, typeFilter, terraformFilter, effectiveRecentLimit]);
 
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortKey(key);
-      setSortDir('asc');
-    }
-  };
+  const visibleSummaryRows = useMemo(() => {
+    return [...summaryRows].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  }, [summaryRows]);
 
   const selectCls = 'h-8 rounded-md border bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30';
 
@@ -273,6 +312,7 @@ const SummaryPage = () => {
           </select>
         </div>
         <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
+        <TerraformFilterSelect value={terraformFilter} options={terraformOptions} onChange={setTerraformFilter} className={selectCls} />
         <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
       </div>
 
@@ -339,7 +379,34 @@ const SummaryPage = () => {
         </div>
 
         <div className="bg-card rounded-xl border p-5">
-          <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h3 className="text-sm font-semibold">Recent Activity</h3>
+            <div className="flex items-start gap-2">
+              <span className="text-xs text-muted-foreground">Show top</span>
+              <div className="flex flex-col gap-1">
+                <select
+                  value={recentLimitOption}
+                  onChange={(e) => setRecentLimitOption(e.target.value as TicketLimitOption)}
+                  className={selectCls}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="30">30</option>
+                  <option value="40">40</option>
+                  <option value="50">50</option>
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={recentCustomLimit}
+                  onChange={(e) => setRecentCustomLimit(e.target.value)}
+                  className={selectCls}
+                  placeholder="Enter Custom Range"
+                />
+              </div>
+            </div>
+          </div>
           <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
             {recentActivity.map((event) => (
               <div key={event.id} className="flex gap-3 group">
@@ -414,6 +481,29 @@ const SummaryPage = () => {
                 <option key={key} value={key}>{label}</option>
               ))}
             </select>
+            <span className="text-xs text-muted-foreground ml-1">Show top</span>
+            <div className="flex flex-col gap-1">
+              <select
+                value={summaryLimitOption}
+                onChange={(e) => setSummaryLimitOption(e.target.value as TicketLimitOption)}
+                className={selectCls}
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="30">30</option>
+                <option value="40">40</option>
+                <option value="50">50</option>
+              </select>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={summaryCustomLimit}
+                onChange={(e) => setSummaryCustomLimit(e.target.value)}
+                className={selectCls}
+                placeholder="Enter Custom Range"
+              />
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -421,21 +511,21 @@ const SummaryPage = () => {
             <thead>
               <tr className="border-b bg-muted/30">
                 <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Ticket</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('department')}>Department {sortIcon('department')}</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('status')}>Status {sortIcon('status')}</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground cursor-pointer" onClick={() => toggleSort('assignee')}>Assigned To {sortIcon('assignee')}</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Department</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Assigned To</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold text-muted-foreground">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {summaryRows.length === 0 && (
+              {visibleSummaryRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-6 text-center text-sm text-muted-foreground">
                     No tickets found for selected filters.
                   </td>
                 </tr>
               )}
-              {summaryRows.map((ticket) => (
+              {visibleSummaryRows.map((ticket) => (
                 <tr key={ticket.id} className="border-b hover:bg-accent/40 transition-colors">
                   <td className="px-3 py-2">
                     <button

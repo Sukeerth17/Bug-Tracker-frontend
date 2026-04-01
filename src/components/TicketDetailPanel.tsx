@@ -19,6 +19,7 @@ import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
 import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
 import UnsavedChangesBadge from '@/components/UnsavedChangesBadge';
 import { typeLabels } from '@/data/models';
+import TerraformSelect from '@/components/TerraformSelect';
 
 const TicketDetailPanel = () => {
   const { currentUser, selectedTicket, setSelectedTicket, updateTicketStatus, updateTicketAssignees, updateTicketDetails, updateTicketAttachments, addTicketComment } = useTickets();
@@ -33,12 +34,14 @@ const TicketDetailPanel = () => {
   const [dueDateDraft, setDueDateDraft] = useState('');
   const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>([]);
   const [typeDraft, setTypeDraft] = useState<TicketType>('task');
+  const [terraformDraft, setTerraformDraft] = useState('');
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [saving, setSaving] = useState(false);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [availableFeatures, setAvailableFeatures] = useState<FeatureItem[]>([]);
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [featureIdDraft, setFeatureIdDraft] = useState<string>('');
   const [attachmentDraft, setAttachmentDraft] = useState<string[]>([]);
   const originalAttachmentsRef = useRef<string[]>([]);
@@ -57,6 +60,7 @@ const TicketDetailPanel = () => {
     setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setTypeDraft(ticket.type);
+    setTerraformDraft(ticket.terraform || '');
     setFeatureIdDraft(ticket.featureId ? String(ticket.featureId) : '');
     const baseAttachments = ticket.attachments || [];
     setAttachmentDraft(baseAttachments);
@@ -81,6 +85,16 @@ const TicketDetailPanel = () => {
     featureApi.getFeatures(effectiveProjectId)
       .then(setAvailableFeatures)
       .catch(() => setAvailableFeatures([]));
+  }, [ticket?.id, effectiveProjectId]);
+
+  useEffect(() => {
+    if (!ticket || !effectiveProjectId) {
+      setTerraformOptions([]);
+      return;
+    }
+    ticketApi.getTerraformOptions(effectiveProjectId)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
   }, [ticket?.id, effectiveProjectId]);
 
   useEffect(() => {
@@ -111,10 +125,11 @@ const TicketDetailPanel = () => {
     const draftDepartments = [...departmentsDraft].sort();
     const departmentsChanged = savedDepartments.join(',') !== draftDepartments.join(',');
     const typeChanged = typeDraft !== ticket.type;
+    const terraformChanged = terraformDraft !== (ticket.terraform || '');
     const featureChanged = (ticket.featureId ? String(ticket.featureId) : '') !== featureIdDraft;
     const attachmentsChanged = (attachmentDraft || []).join(',') !== (ticket.attachments || []).join(',');
-    return statusChanged || assigneesChanged || titleChanged || descChanged || dueChanged || departmentsChanged || typeChanged || featureChanged || attachmentsChanged;
-  }, [ticket, statusDraft, assigneeIdsDraft, titleDraft, descriptionDraft, dueDateDraft, departmentsDraft, typeDraft, featureIdDraft, attachmentDraft]);
+    return statusChanged || assigneesChanged || titleChanged || descChanged || dueChanged || departmentsChanged || typeChanged || terraformChanged || featureChanged || attachmentsChanged;
+  }, [ticket, statusDraft, assigneeIdsDraft, titleDraft, descriptionDraft, dueDateDraft, departmentsDraft, typeDraft, terraformDraft, featureIdDraft, attachmentDraft]);
 
   // Keep draft assignees in sync with server list to drive the multi-select UI.
 
@@ -132,7 +147,8 @@ const TicketDetailPanel = () => {
       const draftDepartments = [...departmentsDraft].sort();
       const departmentsChanged = savedDepartments.join(',') !== draftDepartments.join(',');
       const typeChanged = typeDraft !== ticket.type;
-      const detailsOrMetaChanged = detailsChanged || departmentsChanged || typeChanged;
+      const terraformChanged = terraformDraft !== (ticket.terraform || '');
+      const detailsOrMetaChanged = detailsChanged || departmentsChanged || typeChanged || terraformChanged;
       if (detailsOrMetaChanged) {
         await updateTicketDetails(effectiveProjectId, ticket.id, {
           title: titleDraft.trim(),
@@ -141,6 +157,7 @@ const TicketDetailPanel = () => {
           department: departmentsDraft[0] || ticket.department,
           departmentIds: departmentsDraft,
           type: typeDraft,
+          terraform: terraformDraft || null,
           featureId: featureIdDraft ? Number(featureIdDraft) : null,
         });
       }
@@ -221,6 +238,7 @@ const TicketDetailPanel = () => {
     setDueDateDraft(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setTypeDraft(ticket.type);
+    setTerraformDraft(ticket.terraform || '');
     setFeatureIdDraft(ticket.featureId ? String(ticket.featureId) : '');
     const baseAttachments = ticket.attachments || [];
     setAttachmentDraft(baseAttachments);
@@ -309,6 +327,14 @@ const TicketDetailPanel = () => {
               <option key={key} value={key}>{label}</option>
             ))}
           </select>
+        </div>
+        <div>
+          <TerraformSelect
+            value={terraformDraft}
+            options={terraformOptions}
+            onChange={setTerraformDraft}
+            onCreate={(next) => setTerraformOptions((prev) => (prev.includes(next) ? prev : [...prev, next]))}
+          />
         </div>
         <div className="col-span-2">
           <DepartmentMultiSelect value={departmentsDraft} onChange={setDepartmentsDraft} />

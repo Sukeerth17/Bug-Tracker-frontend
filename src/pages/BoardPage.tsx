@@ -16,6 +16,7 @@ import { ticketApi } from '@/services/ticketApi';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
 import type { TicketType, User } from '@/data/models';
+import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
   { id: 'todo', label: 'TO DO', color: '#94a3b8' },
@@ -103,7 +104,9 @@ const BoardPage = () => {
     unassigned: searchParams.get('unassigned') === 'true',
   });
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [settleTicketId, setSettleTicketId] = useState<string | null>(null);
   const [movingTicketId, setMovingTicketId] = useState<string | null>(null);
   const [ghostColumn, setGhostColumn] = useState<TicketStatus | null>(null);
@@ -137,6 +140,7 @@ const BoardPage = () => {
       featureId: featureId || undefined,
       search: searchTerm || undefined,
       types: typeFilter.length > 0 ? typeFilter : undefined,
+      terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
       sortBy: 'updatedAt',
       sortDir: 'desc',
       page: 0,
@@ -150,7 +154,17 @@ const BoardPage = () => {
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
       .catch(() => setAvailableUsers([]));
-  }, [projectId, featureId, searchTerm, typeFilter]);
+  }, [projectId, featureId, searchTerm, typeFilter, terraformFilter]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setTerraformOptions([]);
+      return;
+    }
+    ticketApi.getTerraformOptions(projectId)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
+  }, [projectId]);
 
   const clearAnimationTimers = () => {
     timeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
@@ -176,6 +190,7 @@ const BoardPage = () => {
         assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
         unassigned: assigneeFilter.unassigned,
         types: typeFilter.length > 0 ? typeFilter : undefined,
+        terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
         sortBy: 'updatedAt',
         sortDir: 'desc',
         page: 0,
@@ -188,7 +203,7 @@ const BoardPage = () => {
       setLoading(false);
       window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: false } }));
     }
-  }, [projectId, featureId, searchTerm, assigneeFilter, typeFilter]);
+  }, [projectId, featureId, searchTerm, assigneeFilter, typeFilter, terraformFilter]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams);
@@ -198,10 +213,12 @@ const BoardPage = () => {
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
     else next.delete('unassigned');
+    if (terraformFilter !== 'all') next.set('terraform', terraformFilter);
+    else next.delete('terraform');
     if (searchTerm) next.set('search', searchTerm);
     else next.delete('search');
     setSearchParams(next, { replace: true });
-  }, [searchTerm, typeFilter, assigneeFilter, searchParams, setSearchParams]);
+  }, [searchTerm, typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadBoard();
@@ -261,6 +278,7 @@ const BoardPage = () => {
           <h1 className="text-xl font-semibold">Board</h1>
         </div>
         <div className="flex items-center gap-2">
+          <TerraformFilterSelect value={terraformFilter} options={terraformOptions} onChange={setTerraformFilter} />
           <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
           <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
         </div>

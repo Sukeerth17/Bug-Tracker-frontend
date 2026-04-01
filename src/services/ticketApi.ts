@@ -1,4 +1,4 @@
-﻿import api from '@/services/api';
+import api from '@/services/api';
 import { ActivityEvent, Ticket, User } from '@/data/models';
 import { API_ENDPOINTS } from '@/services/controlApi';
 
@@ -41,6 +41,7 @@ interface ApiTicket {
   department: Ticket['department'];
   departments?: Ticket['departments'];
   type: Ticket['type'];
+  terraform?: string | null;
   assignee: ApiUser | null;
   assignees?: ApiUser[];
   reporter: ApiUser | null;
@@ -73,6 +74,7 @@ export interface TicketQueryParams {
   unassigned?: boolean;
   featureId?: string | number;
   types?: Ticket['type'][];
+  terraform?: string;
   createdFrom?: string;
   createdTo?: string;
   updatedFrom?: string;
@@ -142,6 +144,7 @@ function mapTicket(ticket: ApiTicket): Ticket {
     department: ticket.department,
     departments: ticket.departments && ticket.departments.length > 0 ? ticket.departments : [ticket.department],
     type: ticket.type,
+    terraform: ticket.terraform ?? null,
     assignee: mappedPrimaryAssignee,
     assignees: mappedAssignees,
     reporter: mapUser(ticket.reporter) || fallbackReporter,
@@ -216,24 +219,33 @@ export const ticketApi = {
     return response.data.map(mapTicket);
   },
 
-  async getSummaryFiltered(projectId: string, params: { department?: string; status?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string }): Promise<Ticket[]> {
+  async getSummaryFiltered(projectId: string, params: { department?: string; status?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; terraform?: string; sortBy?: string; sortDir?: string }): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(API_ENDPOINTS.summary, { params: { projectId, ...params } });
     return response.data.map(mapTicket);
   },
 
-  async getRecent(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+  async getRecent(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; terraform?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/recent`, { params });
     return response.data.map(mapTicket);
   },
 
-  async getForYou(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
+  async getForYou(params: { projectId?: string; featureId?: string | number; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: Ticket['type'][]; terraform?: string; sortBy?: string; sortDir?: string } = {}): Promise<Ticket[]> {
     const response = await api.get<ApiTicket[]>(`${API_ENDPOINTS.tickets}/for-you`, { params });
     return response.data.map(mapTicket);
   },
 
-  async getActivity(projectId: string): Promise<ActivityEvent[]> {
-    const response = await api.get<ApiActivity[]>(API_ENDPOINTS.activity, { params: { projectId } });
+  async getActivity(projectId: string, size?: number, terraform?: string): Promise<ActivityEvent[]> {
+    const response = await api.get<ApiActivity[]>(API_ENDPOINTS.activity, {
+      params: { projectId, size: size && size > 0 ? size : undefined, terraform: terraform || undefined },
+    });
     return response.data.map(mapActivity);
+  },
+
+  async getTerraformOptions(projectId?: string): Promise<string[]> {
+    const response = await api.get<string[]>(`${API_ENDPOINTS.tickets}/terraform-options`, {
+      params: { projectId: projectId || undefined },
+    });
+    return (response.data || []).filter((value) => typeof value === 'string' && value.trim().length > 0);
   },
 
   async getTicketById(projectId: string, ticketId: string): Promise<Ticket> {
@@ -253,6 +265,7 @@ export const ticketApi = {
     department: Ticket['department'];
     departmentIds?: Ticket['department'][];
     type: Ticket['type'];
+    terraform?: string | null;
     assigneeIds: number[];
     reporterId: number;
     dueDate: string | null;
@@ -280,7 +293,7 @@ export const ticketApi = {
     return mapTicket(response.data);
   },
 
-  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null; priority?: Ticket['priority']; department?: Ticket['department']; departmentIds?: Ticket['department'][]; type?: Ticket['type']; featureId?: string | number | null }): Promise<Ticket> {
+  async updateDetails(projectId: string, ticketId: string, payload: { title: string; description: string; dueDate: string | null; priority?: Ticket['priority']; department?: Ticket['department']; departmentIds?: Ticket['department'][]; type?: Ticket['type']; terraform?: string | null; featureId?: string | number | null }): Promise<Ticket> {
     const response = await api.patch<ApiTicket>(
       API_ENDPOINTS.ticketDetails.replace('{ticketId}', ticketId),
       payload,

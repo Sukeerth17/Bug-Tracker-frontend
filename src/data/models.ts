@@ -42,6 +42,7 @@ export interface Ticket {
   department: Department;
   departments: Department[];
   type: TicketType;
+  terraform?: string | null;
   assignee: User | null;
   assignees: User[];
   reporter: User;

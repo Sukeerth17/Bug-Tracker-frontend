@@ -9,7 +9,7 @@ interface TicketContextType {
   selectedTicket: Ticket | null;
   setSelectedTicket: (ticket: Ticket | null) => void;
   updateTicketStatus: (projectId: string, id: string, status: TicketStatus) => Promise<void>;
-  updateTicketDetails: (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null; priority?: TicketPriority; department?: Department; departmentIds?: Department[]; type?: TicketType; featureId?: string | number | null }) => Promise<void>;
+  updateTicketDetails: (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null; priority?: TicketPriority; department?: Department; departmentIds?: Department[]; type?: TicketType; terraform?: string | null; featureId?: string | number | null }) => Promise<void>;
   updateTicketAttachments: (projectId: string, id: string, attachments: string[]) => Promise<void>;
   createTicket: (ticket: {
     projectId: string;
@@ -19,6 +19,7 @@ interface TicketContextType {
     department: Department;
     departments: Department[];
     type: TicketType;
+    terraform?: string | null;
     priority: TicketPriority;
     status: TicketStatus;
     assignees: User[];
@@ -61,7 +62,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
     toast('Status updated');
   }, []);
 
-  const updateTicketDetails = useCallback(async (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null; priority?: TicketPriority; department?: Department; departmentIds?: Department[]; type?: TicketType; featureId?: string | number | null }) => {
+  const updateTicketDetails = useCallback(async (projectId: string, id: string, payload: { title: string; description: string; dueDate: string | null; priority?: TicketPriority; department?: Department; departmentIds?: Department[]; type?: TicketType; terraform?: string | null; featureId?: string | number | null }) => {
     const updated = await ticketApi.updateDetails(projectId, id, payload);
     setSelectedTicket((prev) => (prev && prev.id === id ? updated : prev));
     window.dispatchEvent(new CustomEvent('ticket:updated', { detail: { projectId } }));
@@ -81,6 +82,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
     department: Department;
     departments: Department[];
     type: TicketType;
+    terraform?: string | null;
     priority: TicketPriority;
     status: TicketStatus;
     assignees: User[];
@@ -96,6 +98,7 @@ export const TicketProvider = ({ children }: { children: ReactNode }) => {
       department: data.department,
       departmentIds: data.departments,
       type: data.type,
+      terraform: data.terraform ?? null,
       priority: data.priority,
       status: data.status,
       assigneeIds,

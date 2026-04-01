@@ -14,6 +14,7 @@ import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
+import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'dueDate' | 'assignee';
 
@@ -37,7 +38,9 @@ const ListPage = () => {
     unassigned: searchParams.get('unassigned') === 'true',
   });
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
@@ -64,6 +67,7 @@ const ListPage = () => {
         assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
         unassigned: assigneeFilter.unassigned,
         types: typeFilter.length > 0 ? typeFilter : undefined,
+        terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
         sortBy: sortKey,
         sortDir: sortAsc ? 'asc' : 'desc',
         page,
@@ -81,7 +85,7 @@ const ListPage = () => {
       setLoading(false);
       window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: false } }));
     }
-  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, assigneeFilter, typeFilter, sortKey, sortAsc, page, pageSize]);
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, assigneeFilter, typeFilter, terraformFilter, sortKey, sortAsc, page, pageSize]);
 
   useEffect(() => {
     if (!projectId) {
@@ -94,6 +98,7 @@ const ListPage = () => {
       status: statusFilter === 'all' ? undefined : statusFilter,
       priority: priorityFilter === 'all' ? undefined : priorityFilter,
       types: typeFilter.length > 0 ? typeFilter : undefined,
+      terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
       sortBy: sortKey,
       sortDir: sortAsc ? 'asc' : 'desc',
       page: 0,
@@ -107,7 +112,17 @@ const ListPage = () => {
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
       .catch(() => setAvailableUsers([]));
-  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, typeFilter, sortKey, sortAsc]);
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, typeFilter, terraformFilter, sortKey, sortAsc]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setTerraformOptions([]);
+      return;
+    }
+    ticketApi.getTerraformOptions(projectId)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
+  }, [projectId]);
 
   useEffect(() => {
     setPage(0);
@@ -121,10 +136,12 @@ const ListPage = () => {
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
     else next.delete('unassigned');
+    if (terraformFilter !== 'all') next.set('terraform', terraformFilter);
+    else next.delete('terraform');
     if (contextSearch) next.set('search', contextSearch);
     else next.delete('search');
     setSearchParams(next, { replace: true });
-  }, [contextSearch, typeFilter, assigneeFilter, searchParams, setSearchParams]);
+  }, [contextSearch, typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadTickets();
@@ -260,6 +277,14 @@ const ListPage = () => {
             setTypeFilter(next);
             setPage(0);
           }} />
+          <TerraformFilterSelect
+            value={terraformFilter}
+            options={terraformOptions}
+            onChange={(next) => {
+              setTerraformFilter(next);
+              setPage(0);
+            }}
+          />
           <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={(next) => {
             setAssigneeFilter(next);
             setPage(0);

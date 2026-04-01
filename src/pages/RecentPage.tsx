@@ -9,6 +9,7 @@ import { featureApi, FeatureItem } from '@/services/featureApi';
 import { useSearchParams } from 'react-router-dom';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
+import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 const RecentPage = () => {
   const { setSelectedTicket } = useTickets();
@@ -21,6 +22,8 @@ const RecentPage = () => {
   const [featureFilter, setFeatureFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<Department | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<{ assigneeIds: string[]; unassigned: boolean }>({
     assigneeIds: searchParams.get('assigneeIds')?.split(',').filter(Boolean) || [],
     unassigned: searchParams.get('unassigned') === 'true',
@@ -51,7 +54,7 @@ const RecentPage = () => {
   }, [projects]);
 
   useEffect(() => {
-    const params: { projectId?: string; featureId?: string; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: TicketType[]; sortBy?: string; sortDir?: string } = {
+    const params: { projectId?: string; featureId?: string; department?: string; assigneeIds?: number[]; unassigned?: boolean; types?: TicketType[]; terraform?: string; sortBy?: string; sortDir?: string } = {
       sortBy,
       sortDir,
     };
@@ -59,13 +62,14 @@ const RecentPage = () => {
     if (featureFilter !== 'all') params.featureId = featureFilter;
     if (departmentFilter !== 'all') params.department = departmentFilter;
     if (typeFilter.length > 0) params.types = typeFilter;
+    if (terraformFilter !== 'all') params.terraform = terraformFilter;
     if (assigneeFilter.assigneeIds.length > 0) params.assigneeIds = assigneeFilter.assigneeIds.map(Number);
     if (assigneeFilter.unassigned) params.unassigned = true;
 
     ticketApi.getRecent(params)
       .then((res) => setRecent(res))
       .catch(() => setRecent([]));
-  }, [projectFilter, featureFilter, departmentFilter, typeFilter, assigneeFilter, sortBy, sortDir]);
+  }, [projectFilter, featureFilter, departmentFilter, typeFilter, terraformFilter, assigneeFilter, sortBy, sortDir]);
 
   useEffect(() => {
     const next = new URLSearchParams(searchParams);
@@ -75,8 +79,10 @@ const RecentPage = () => {
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
     else next.delete('unassigned');
+    if (terraformFilter !== 'all') next.set('terraform', terraformFilter);
+    else next.delete('terraform');
     setSearchParams(next, { replace: true });
-  }, [typeFilter, assigneeFilter, searchParams, setSearchParams]);
+  }, [typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   const filteredFeatures = useMemo(() => {
     if (projectFilter === 'all') return [];
@@ -84,7 +90,7 @@ const RecentPage = () => {
   }, [features, projectFilter]);
 
   useEffect(() => {
-    const params: { projectId?: string; featureId?: string; department?: string; types?: TicketType[]; sortBy?: string; sortDir?: string } = {
+    const params: { projectId?: string; featureId?: string; department?: string; types?: TicketType[]; terraform?: string; sortBy?: string; sortDir?: string } = {
       sortBy,
       sortDir,
     };
@@ -92,6 +98,7 @@ const RecentPage = () => {
     if (featureFilter !== 'all') params.featureId = featureFilter;
     if (departmentFilter !== 'all') params.department = departmentFilter;
     if (typeFilter.length > 0) params.types = typeFilter;
+    if (terraformFilter !== 'all') params.terraform = terraformFilter;
 
     ticketApi.getRecent(params)
       .then((rows) => {
@@ -102,7 +109,13 @@ const RecentPage = () => {
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
       .catch(() => setAvailableUsers([]));
-  }, [projectFilter, featureFilter, departmentFilter, typeFilter, sortBy, sortDir]);
+  }, [projectFilter, featureFilter, departmentFilter, typeFilter, terraformFilter, sortBy, sortDir]);
+
+  useEffect(() => {
+    ticketApi.getTerraformOptions(projectFilter === 'all' ? undefined : projectFilter)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
+  }, [projectFilter]);
 
   useEffect(() => {
     if (projectFilter === 'all') {
@@ -164,6 +177,7 @@ const RecentPage = () => {
           ))}
         </select>
         <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
+        <TerraformFilterSelect value={terraformFilter} options={terraformOptions} onChange={setTerraformFilter} />
         <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
         <select
           value={sortBy}

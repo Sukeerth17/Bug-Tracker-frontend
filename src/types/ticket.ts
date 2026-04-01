@@ -5,5 +5,6 @@ export interface Ticket {
   status: string
   priority: string
   department: string
+  terraform?: string | null
   assignee?: string
 }

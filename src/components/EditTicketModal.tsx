@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
 import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
 import UnsavedChangesBadge from '@/components/UnsavedChangesBadge';
+import TerraformSelect from '@/components/TerraformSelect';
 
 interface EditTicketModalProps {
   open: boolean;
@@ -26,6 +27,8 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
   const [priority, setPriority] = useState<TicketPriority>('medium');
   const [departmentsDraft, setDepartmentsDraft] = useState<Department[]>(['Website']);
   const [type, setType] = useState<TicketType>('task');
+  const [terraform, setTerraform] = useState('');
+  const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [dueDate, setDueDate] = useState('');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<string[]>([]);
@@ -42,6 +45,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
     setPriority(ticket.priority);
     setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setType(ticket.type);
+    setTerraform(ticket.terraform || '');
     setDueDate(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setAssigneeIds(ticket.assignees.map((a) => a.id));
     setAttachments(ticket.attachments || []);
@@ -66,6 +70,13 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
       .catch(() => setAvailableUsers([]));
   }, [open, projectId]);
 
+  useEffect(() => {
+    if (!open || !projectId) return;
+    ticketApi.getTerraformOptions(projectId)
+      .then(setTerraformOptions)
+      .catch(() => setTerraformOptions([]));
+  }, [open, projectId]);
+
   if (!open || !ticket) return null;
 
   const lastEdit = useMemo(() => {
@@ -86,6 +97,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
       || status !== ticket.status
       || priority !== ticket.priority
       || type !== ticket.type
+      || terraform !== (ticket.terraform || '')
       || dueDate !== (ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '')
       || savedDepartments.join(',') !== draftDepartments.join(',')
       || assigneeIds.slice().sort().join(',') !== ticket.assignees.map((a) => a.id).sort().join(',')
@@ -106,6 +118,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
         department: departmentsDraft[0] || 'Website',
         departmentIds: departmentsDraft,
         type,
+        terraform: terraform || null,
         featureId: selectedFeatures[0]?.id ? Number(selectedFeatures[0].id) : null,
       });
 
@@ -137,6 +150,7 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
     setPriority(ticket.priority);
     setDepartmentsDraft(ticket.departments?.length ? ticket.departments : [ticket.department]);
     setType(ticket.type);
+    setTerraform(ticket.terraform || '');
     setDueDate(ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : '');
     setAssigneeIds(ticket.assignees.map((a) => a.id));
     setAttachments(ticket.attachments || []);
@@ -198,6 +212,16 @@ const EditTicketModal = ({ open, ticket, projectId, onClose }: EditTicketModalPr
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <TerraformSelect
+                value={terraform}
+                options={terraformOptions}
+                onChange={setTerraform}
+                onCreate={(next) => setTerraformOptions((prev) => (prev.includes(next) ? prev : [...prev, next]))}
+                selectClassName="h-10 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 w-full"
+              />
             </div>
 
             <div>
