@@ -87,31 +87,28 @@ const SummaryPage = () => {
       setActivityTickets({});
       return;
     }
-    ticketApi.getActivity(projectId, effectiveRecentLimit, terraformFilter !== 'all' ? terraformFilter : undefined)
-      .then(setActivity)
-      .catch(() => setActivity([]));
-  }, [projectId, effectiveRecentLimit, terraformFilter]);
-
-  useEffect(() => {
-    if (!projectId || activity.length === 0) {
-      setActivityTickets({});
-      return;
-    }
-    const ids = Array.from(new Set(activity.map((event) => event.ticketId).filter(Boolean))) as string[];
-    if (ids.length === 0) {
-      setActivityTickets({});
-      return;
-    }
-    Promise.all(ids.map((id) => ticketApi.getTicketById(projectId, id).catch(() => null)))
-      .then((rows) => {
-        const next: Record<string, Ticket> = {};
-        rows.forEach((ticket) => {
-          if (ticket) next[ticket.id] = ticket;
+    Promise.all([
+      ticketApi.getActivity(projectId, effectiveRecentLimit, terraformFilter !== 'all' ? terraformFilter : undefined),
+      ticketApi.queryTickets(projectId, {
+        sortBy: 'updatedAt',
+        sortDir: 'desc',
+        page: 0,
+        size: 50,
+      }),
+    ])
+      .then(([events, ticketsPage]) => {
+        setActivity(events);
+        const map: Record<string, Ticket> = {};
+        ticketsPage.items.forEach((ticket) => {
+          map[ticket.id] = ticket;
         });
-        setActivityTickets(next);
+        setActivityTickets(map);
       })
-      .catch(() => setActivityTickets({}));
-  }, [activity, projectId]);
+      .catch(() => {
+        setActivity([]);
+        setActivityTickets({});
+      });
+  }, [projectId, effectiveRecentLimit, terraformFilter]);
 
   const fetchSummary = useCallback(() => {
     if (!projectId) {
