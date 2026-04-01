@@ -27,7 +27,9 @@ api.interceptors.response.use(
       || requestUrl.includes('/auth/signup')
       || requestUrl.includes('/auth/forgot-password')
       || requestUrl.includes('/auth/reset-password');
-    if ((status === 401 || status === 403) && !isAuthEndpoint) {
+    // 403 can be a normal authorization failure for a specific resource (for example,
+    // one inaccessible ticket in summary). Only treat 401 as session expiry globally.
+    if (status === 401 && !isAuthEndpoint) {
       handleSessionExpired();
     }
     return Promise.reject(error);
