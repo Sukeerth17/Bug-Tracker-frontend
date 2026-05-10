@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useTickets } from '@/contexts/TicketContext';
 import { departments, statusLabels, priorityLabels, typeLabels } from '@/data/models';
 import type { TicketStatus, TicketPriority, TicketType, Department } from '@/data/models';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { resolveFeatureId, resolveProjectId, setActiveProjectId } from '@/services/projectControl';
 import { projectApi, ProjectItem } from '@/services/projectApi';
 import { ticketApi } from '@/services/ticketApi';
@@ -14,6 +14,7 @@ import AssigneeMultiSelect from '@/components/AssigneeMultiSelect';
 import DepartmentMultiSelect from '@/components/DepartmentMultiSelect';
 import SearchableFeatureSelect from '@/components/SearchableFeatureSelect';
 import TerraformSelect from '@/components/TerraformSelect';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface NewTicketModalProps {
   open: boolean;
@@ -23,7 +24,8 @@ interface NewTicketModalProps {
 
 const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModalProps) => {
   const location = useLocation();
-  const { createTicket } = useTickets();
+  const navigate = useNavigate();
+  const { createTicket, setSelectedTicket } = useTickets();
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [features, setFeatures] = useState<FeatureItem[]>([]);
@@ -45,6 +47,11 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const [attachments, setAttachments] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [duplicateNoticeOpen, setDuplicateNoticeOpen] = useState(false);
+  const [duplicatePromptOpen, setDuplicatePromptOpen] = useState(false);
+  const [duplicateTicketId, setDuplicateTicketId] = useState<string | null>(null);
+  const [duplicateProjectId, setDuplicateProjectId] = useState<string | null>(null);
+  const [duplicateTitle, setDuplicateTitle] = useState('');
   const createStatusOptions: TicketStatus[] = ['todo', 'in-progress'];
 
   React.useEffect(() => {
@@ -113,9 +120,27 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
     setNewFeatureName('');
     setCreatingFeature(false);
     setFeatureError('');
+    setDuplicateNoticeOpen(false);
+    setDuplicatePromptOpen(false);
+    setDuplicateTicketId(null);
+    setDuplicateProjectId(null);
+    setDuplicateTitle('');
   }, [open, projectId]);
 
   if (!open) return null;
+
+  const findExistingTicketByTitle = async (lookupProjectId: string, lookupTitle: string) => {
+    const response = await ticketApi.queryTickets(lookupProjectId, {
+      search: lookupTitle,
+      q: lookupTitle,
+      sortBy: 'updatedAt',
+      sortDir: 'desc',
+      page: 0,
+      size: 200,
+    });
+    const normalizedTitle = lookupTitle.trim().toLowerCase();
+    return response.items.find((ticket) => ticket.title.trim().toLowerCase() === normalizedTitle) || null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +148,15 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
     setSubmitError('');
     setSubmitting(true);
     try {
+      const existingTicket = await findExistingTicketByTitle(projectId, title);
+      if (existingTicket) {
+        setDuplicateTicketId(existingTicket.id);
+        setDuplicateProjectId(existingTicket.projectId);
+        setDuplicateTitle(existingTicket.title);
+        setSubmitError('Ticket already Existed');
+        setDuplicateNoticeOpen(true);
+        return;
+      }
       setActiveProjectId(projectId);
       await createTicket({
         projectId,
@@ -153,7 +187,29 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
       setAttachments([]);
       setSubmitError('');
     } catch (err: any) {
-      setSubmitError(err?.response?.data?.message || 'Failed to create ticket');
+      const statusCode = err?.response?.status;
+      const rawMessage = err?.response?.data?.message;
+      const message = rawMessage || 'Failed to create ticket';
+      const rawData = err?.response?.data;
+      const fallbackMessage = typeof rawData === 'string' ? rawData : '';
+      const duplicateMessage = typeof rawMessage === 'string' && /ticket already exist/i.test(rawMessage);
+      const duplicateFallback = /ticket already exist|duplicate/i.test(fallbackMessage);
+      if (duplicateMessage || duplicateFallback || statusCode === 400 || statusCode === 409) {
+        setSubmitError('Ticket already Existed');
+        try {
+          const existing = await findExistingTicketByTitle(projectId, title);
+          if (existing) {
+            setDuplicateTicketId(existing.id);
+            setDuplicateProjectId(existing.projectId);
+            setDuplicateTitle(existing.title);
+          }
+        } catch {
+          // Keep original error message if we fail to resolve the duplicate ticket.
+        }
+        setDuplicateNoticeOpen(true);
+        return;
+      }
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
     }
@@ -180,15 +236,16 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
   const labelCls = "text-xs font-medium text-muted-foreground mb-1 block";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-fade-in border ticket-rubber-fix">
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-base font-semibold">New Ticket</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="ticket-rubber-scroll">
-        <form onSubmit={handleSubmit} className="p-4 space-y-4 ticket-snap-form">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-card rounded-xl shadow-2xl w-full max-w-lg mx-4 animate-fade-in border ticket-rubber-fix">
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-base font-semibold">New Ticket</h2>
+            <button onClick={onClose} className="p-1 rounded hover:bg-accent transition-colors text-muted-foreground"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="ticket-rubber-scroll">
+          <form onSubmit={handleSubmit} className="p-4 space-y-4 ticket-snap-form">
           <div>
             <label className={labelCls}>Title *</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className="w-full h-9 rounded-md border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" placeholder="Brief summary of the issue" required />
@@ -298,10 +355,54 @@ const NewTicketModal = ({ open, onClose, defaultStatus = 'todo' }: NewTicketModa
             <button type="submit" disabled={submitting || !projectId || !featureId} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">{submitting ? 'Creating...' : 'Create Ticket'}</button>
           </div>
           {submitError && <p className="text-xs text-destructive">{submitError}</p>}
-        </form>
+          </form>
+          </div>
         </div>
       </div>
-    </div>
+      <ConfirmationModal
+        isOpen={duplicateNoticeOpen}
+        title="Ticket already Existed"
+        message={`"${duplicateTitle || title.trim()}" already exists.`}
+        titleClassName="text-foreground"
+        messageClassName="text-foreground font-medium"
+        confirmLabel="OK"
+        cancelLabel="Close"
+        onConfirm={() => {
+          setDuplicateNoticeOpen(false);
+          if (duplicateTicketId && duplicateProjectId) {
+            setDuplicatePromptOpen(true);
+          }
+        }}
+        onCancel={() => setDuplicateNoticeOpen(false)}
+        variant="warning"
+      />
+      <ConfirmationModal
+        isOpen={duplicatePromptOpen}
+        title="Ticket Already Exists"
+        message={`"${duplicateTitle || title.trim()}" already exists. Do you want to redirect to that ticket?`}
+        titleClassName="text-foreground"
+        messageClassName="text-foreground font-medium"
+        confirmLabel="Yes"
+        cancelLabel="No"
+        onConfirm={async () => {
+          if (!duplicateProjectId || !duplicateTicketId) {
+            setDuplicatePromptOpen(false);
+            return;
+          }
+          try {
+            const existingTicket = await ticketApi.getTicketById(duplicateProjectId, duplicateTicketId);
+            setSelectedTicket(existingTicket);
+            setActiveProjectId(duplicateProjectId);
+            navigate(`/space/${duplicateProjectId}/board`);
+            onClose();
+          } finally {
+            setDuplicatePromptOpen(false);
+          }
+        }}
+        onCancel={() => setDuplicatePromptOpen(false)}
+        variant="warning"
+      />
+    </>
   );
 };
 

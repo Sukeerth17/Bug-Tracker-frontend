@@ -5,6 +5,8 @@ interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
   message: string;
+  titleClassName?: string;
+  messageClassName?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -16,6 +18,8 @@ const ConfirmationModal = ({
   isOpen,
   title,
   message,
+  titleClassName,
+  messageClassName,
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   onConfirm,
@@ -74,10 +78,10 @@ const ConfirmationModal = ({
         className="relative z-10 w-full max-w-md mx-4 bg-card border rounded-xl shadow-2xl animate-fade-in"
       >
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold">{title}</h2>
+          <h2 className={cn('text-lg font-semibold', titleClassName)}>{title}</h2>
         </div>
         <div className="p-4">
-          <p className="text-sm text-muted-foreground">{message}</p>
+          <p className={cn('text-sm text-muted-foreground', messageClassName)}>{message}</p>
         </div>
         <div className="p-4 pt-0 flex items-center justify-end gap-2">
           <button

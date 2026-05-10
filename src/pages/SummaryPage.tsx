@@ -73,13 +73,10 @@ const SummaryPage = () => {
       setDashboard(null);
       return;
     }
-    const deptParam = deptFilter === 'All'
-      ? undefined
-      : deptFilter.toUpperCase().replace(/\s+/g, '_');
-    dashboardApi.getSummary(projectId, deptParam)
+    dashboardApi.getSummary(projectId)
       .then(setDashboard)
       .catch(() => setDashboard(null));
-  }, [projectId, deptFilter]);
+  }, [projectId]);
 
   const fetchActivity = useCallback(() => {
     if (!projectId) {
@@ -115,7 +112,7 @@ const SummaryPage = () => {
       setSummaryRows([]);
       return;
     }
-    ticketApi.queryTickets(projectId, {
+    ticketApi.getSummaryFiltered(projectId, {
       department: listDeptFilter === 'All' ? undefined : listDeptFilter,
       status: listStatusFilter === 'All' ? undefined : listStatusFilter,
       assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
@@ -124,10 +121,8 @@ const SummaryPage = () => {
       terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
       sortBy: 'updatedAt',
       sortDir: 'desc',
-      page: 0,
-      size: effectiveSummaryLimit,
     })
-      .then((response) => setSummaryRows(response.items))
+      .then((rows) => setSummaryRows(rows.slice(0, effectiveSummaryLimit)))
       .catch(() => setSummaryRows([]));
   }, [projectId, listDeptFilter, listStatusFilter, assigneeFilter, typeFilter, terraformFilter, effectiveSummaryLimit]);
 
@@ -171,39 +166,14 @@ const SummaryPage = () => {
   }, [fetchActivity, fetchDashboard, fetchSummary]);
 
   const statusCounts = useMemo(() => {
-    const fromSummaryRows = () => {
-      const fallback = { todo: 0, inProgress: 0, inReview: 0, done: 0 };
-      for (const ticket of summaryRows) {
-        if (ticket.status === 'todo') fallback.todo += 1;
-        else if (ticket.status === 'in-progress') fallback.inProgress += 1;
-        else if (ticket.status === 'in-review') fallback.inReview += 1;
-        else if (ticket.status === 'done') fallback.done += 1;
-      }
-      const total = fallback.todo + fallback.inProgress + fallback.inReview + fallback.done;
-      return { ...fallback, total };
-    };
-
-    const hasAssigneeFilter = assigneeFilter.assigneeIds.length > 0 || assigneeFilter.unassigned;
-    const hasTypeFilter = typeFilter.length > 0;
-    const hasListFilters = listDeptFilter !== 'All' || listStatusFilter !== 'All';
-    if (hasAssigneeFilter || hasTypeFilter || hasListFilters) {
-      return fromSummaryRows();
-    }
-
-    if (dashboard) {
-      const byStatus = dashboard.byStatus || {};
-      const todo = Number(byStatus['todo'] || byStatus['TODO'] || 0);
-      const inProgress = Number(byStatus['in-progress'] || byStatus['IN_PROGRESS'] || 0);
-      const inReview = Number(byStatus['in-review'] || byStatus['IN_REVIEW'] || 0);
-      const done = Number(byStatus['done'] || byStatus['DONE'] || 0);
-      const total = Number(dashboard.totalTickets ?? (todo + inProgress + inReview + done));
-      const sum = todo + inProgress + inReview + done;
-      if (sum > 0 || summaryRows.length === 0) {
-        return { todo, inProgress, inReview, done, total };
-      }
-    }
-    return fromSummaryRows();
-  }, [dashboard, summaryRows, assigneeFilter, typeFilter, listDeptFilter, listStatusFilter]);
+    const byStatus = dashboard?.byStatus || {};
+    const todo = Number(byStatus['todo'] || byStatus['TODO'] || 0);
+    const inProgress = Number(byStatus['in-progress'] || byStatus['IN_PROGRESS'] || 0);
+    const inReview = Number(byStatus['in-review'] || byStatus['IN_REVIEW'] || 0);
+    const done = Number(byStatus['done'] || byStatus['DONE'] || 0);
+    const total = Number(dashboard?.totalTickets ?? (todo + inProgress + inReview + done));
+    return { todo, inProgress, inReview, done, total };
+  }, [dashboard]);
 
   const stats = useMemo(() => {
     return [

@@ -69,6 +69,7 @@ export interface TicketQueryParams {
   status?: Ticket['status'];
   priority?: Ticket['priority'];
   department?: string;
+  departments?: string[];
   assigneeId?: number;
   assigneeIds?: number[];
   unassigned?: boolean;

@@ -3,7 +3,7 @@ import { useTickets } from '@/contexts/TicketContext';
 import { PriorityIcon, TypeIcon, UserAvatar, StatusBadge, AssigneeStack } from '@/components/TicketBadges';
 import TicketMenu from '@/components/TicketMenu';
 import { priorityLabels, statusLabels, Ticket } from '@/data/models';
-import type { TicketPriority, TicketStatus, TicketType, User } from '@/data/models';
+import type { TicketPriority, TicketStatus, TicketType, User, Department } from '@/data/models';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus, Search, ChevronLeft, ChevronRight, Download, Paperclip } from 'lucide-react';
@@ -14,9 +14,11 @@ import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
+import DepartmentFilterPopover from '@/components/DepartmentFilterPopover';
 import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 type SortKey = 'title' | 'status' | 'priority' | 'createdAt' | 'updatedAt' | 'dueDate' | 'assignee';
+
 
 const ListPage = () => {
   const { setSelectedTicket } = useTickets();
@@ -38,6 +40,7 @@ const ListPage = () => {
     unassigned: searchParams.get('unassigned') === 'true',
   });
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [departmentFilter, setDepartmentFilter] = useState<Department[]>(searchParams.get('departments')?.split(',').filter(Boolean) as Department[] || []);
   const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
@@ -67,6 +70,7 @@ const ListPage = () => {
         assigneeIds: assigneeFilter.assigneeIds.length > 0 ? assigneeFilter.assigneeIds.map(Number) : undefined,
         unassigned: assigneeFilter.unassigned,
         types: typeFilter.length > 0 ? typeFilter : undefined,
+        departments: departmentFilter.length > 0 ? departmentFilter : undefined,
         terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
         sortBy: sortKey,
         sortDir: sortAsc ? 'asc' : 'desc',
@@ -85,7 +89,7 @@ const ListPage = () => {
       setLoading(false);
       window.dispatchEvent(new CustomEvent('ticket:context-search-loading', { detail: { loading: false } }));
     }
-  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, assigneeFilter, typeFilter, terraformFilter, sortKey, sortAsc, page, pageSize]);
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, assigneeFilter, typeFilter, departmentFilter, terraformFilter, sortKey, sortAsc, page, pageSize]);
 
   useEffect(() => {
     if (!projectId) {
@@ -98,6 +102,7 @@ const ListPage = () => {
       status: statusFilter === 'all' ? undefined : statusFilter,
       priority: priorityFilter === 'all' ? undefined : priorityFilter,
       types: typeFilter.length > 0 ? typeFilter : undefined,
+      departments: departmentFilter.length > 0 ? departmentFilter : undefined,
       terraform: terraformFilter !== 'all' ? terraformFilter : undefined,
       sortBy: sortKey,
       sortDir: sortAsc ? 'asc' : 'desc',
@@ -112,7 +117,7 @@ const ListPage = () => {
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
       .catch(() => setAvailableUsers([]));
-  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, typeFilter, terraformFilter, sortKey, sortAsc]);
+  }, [projectId, featureId, contextSearch, statusFilter, priorityFilter, typeFilter, departmentFilter, terraformFilter, sortKey, sortAsc]);
 
   useEffect(() => {
     if (!projectId) {
@@ -132,6 +137,8 @@ const ListPage = () => {
     const next = new URLSearchParams(searchParams);
     if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
     else next.delete('types');
+    if (departmentFilter.length > 0) next.set('departments', departmentFilter.join(','));
+    else next.delete('departments');
     if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
@@ -141,7 +148,7 @@ const ListPage = () => {
     if (contextSearch) next.set('search', contextSearch);
     else next.delete('search');
     setSearchParams(next, { replace: true });
-  }, [contextSearch, typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
+  }, [contextSearch, typeFilter, departmentFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadTickets();
@@ -275,6 +282,10 @@ const ListPage = () => {
           </select>
           <TypeFilterPopover value={typeFilter} onApply={(next) => {
             setTypeFilter(next);
+            setPage(0);
+          }} />
+          <DepartmentFilterPopover value={departmentFilter} onApply={(next) => {
+            setDepartmentFilter(next);
             setPage(0);
           }} />
           <TerraformFilterSelect

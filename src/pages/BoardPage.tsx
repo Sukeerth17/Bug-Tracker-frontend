@@ -15,7 +15,8 @@ import { resolveProjectId } from '@/services/projectControl';
 import { ticketApi } from '@/services/ticketApi';
 import TypeFilterPopover from '@/components/TypeFilterPopover';
 import AssigneeFilterPopover from '@/components/AssigneeFilterPopover';
-import type { TicketType, User } from '@/data/models';
+import DepartmentFilterPopover from '@/components/DepartmentFilterPopover';
+import type { TicketType, User, Department } from '@/data/models';
 import TerraformFilterSelect from '@/components/TerraformFilterSelect';
 
 const columns: { id: TicketStatus; label: string; color: string }[] = [
@@ -104,11 +105,13 @@ const BoardPage = () => {
     unassigned: searchParams.get('unassigned') === 'true',
   });
   const [typeFilter, setTypeFilter] = useState<TicketType[]>(searchParams.get('types')?.split(',').filter(Boolean) as TicketType[] || []);
+  const [departmentFilter, setDepartmentFilter] = useState<Department[]>(searchParams.get('departments')?.split(',').filter(Boolean) as Department[] || []);
   const [terraformFilter, setTerraformFilter] = useState<string>(searchParams.get('terraform') || 'all');
   const [availableUsers, setAvailableUsers] = useState<User[]>([]);
   const [terraformOptions, setTerraformOptions] = useState<string[]>([]);
   const [settleTicketId, setSettleTicketId] = useState<string | null>(null);
   const [movingTicketId, setMovingTicketId] = useState<string | null>(null);
+  const [, setOrderRevision] = useState(0);
   const [ghostColumn, setGhostColumn] = useState<TicketStatus | null>(null);
   const [floatingTicket, setFloatingTicket] = useState<FloatingTicketState | null>(null);
   const [pendingMove, setPendingMove] = React.useState<{
@@ -126,10 +129,44 @@ const BoardPage = () => {
   });
   const timeoutsRef = useRef<number[]>([]);
 
-  const grouped = columns.map(col => ({
-    ...col,
-    tickets: boardTickets.filter(t => t.status === col.id && t.id !== movingTicketId),
-  }));
+  const grouped = columns.map(col => {
+    const rawTickets = boardTickets.filter(t => 
+      t.status === col.id && 
+      t.id !== movingTicketId &&
+      (departmentFilter.length === 0 || departmentFilter.some(d => t.departments?.includes(d) || t.department === d))
+    );
+
+    let sortedTickets = rawTickets;
+    if (projectId) {
+      const storageKey = `board-order-${projectId}-${col.id}`;
+      const savedOrderRaw = localStorage.getItem(storageKey);
+      if (savedOrderRaw) {
+        try {
+          const savedOrder: string[] = JSON.parse(savedOrderRaw);
+          const orderMap = new Map<string, number>();
+          savedOrder.forEach((id, index) => orderMap.set(id, index));
+
+          sortedTickets = [...rawTickets].sort((a, b) => {
+            const indexA = orderMap.has(a.id) ? orderMap.get(a.id)! : -1;
+            const indexB = orderMap.has(b.id) ? orderMap.get(b.id)! : -1;
+
+            if (indexA === -1 && indexB !== -1) return -1;
+            if (indexB === -1 && indexA !== -1) return 1;
+            if (indexA === -1 && indexB === -1) return 0;
+
+            return indexA - indexB;
+          });
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+    }
+
+    return {
+      ...col,
+      tickets: sortedTickets,
+    };
+  });
 
   useEffect(() => {
     if (!projectId) {
@@ -153,7 +190,9 @@ const BoardPage = () => {
         });
         setAvailableUsers(Array.from(users.values()).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })));
       })
-      .catch(() => setAvailableUsers([]));
+      .catch(() => {
+        setAvailableUsers([]);
+      });
   }, [projectId, featureId, searchTerm, typeFilter, terraformFilter]);
 
   useEffect(() => {
@@ -209,6 +248,8 @@ const BoardPage = () => {
     const next = new URLSearchParams(searchParams);
     if (typeFilter.length > 0) next.set('types', typeFilter.join(','));
     else next.delete('types');
+    if (departmentFilter.length > 0) next.set('departments', departmentFilter.join(','));
+    else next.delete('departments');
     if (assigneeFilter.assigneeIds.length > 0) next.set('assigneeIds', assigneeFilter.assigneeIds.join(','));
     else next.delete('assigneeIds');
     if (assigneeFilter.unassigned) next.set('unassigned', 'true');
@@ -218,7 +259,7 @@ const BoardPage = () => {
     if (searchTerm) next.set('search', searchTerm);
     else next.delete('search');
     setSearchParams(next, { replace: true });
-  }, [searchTerm, typeFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
+  }, [searchTerm, typeFilter, departmentFilter, assigneeFilter, terraformFilter, searchParams, setSearchParams]);
 
   useEffect(() => {
     loadBoard();
@@ -238,7 +279,25 @@ const BoardPage = () => {
     if (!result.destination) return;
     const fromStatus = result.source.droppableId as TicketStatus;
     const toStatus = result.destination.droppableId as TicketStatus;
-    if (fromStatus === toStatus) return;
+    
+    if (fromStatus === toStatus) {
+      if (result.source.index === result.destination.index) return;
+      if (!projectId) return;
+
+      const columnGroup = grouped.find(g => g.id === fromStatus);
+      if (!columnGroup) return;
+
+      const columnTickets = [...columnGroup.tickets];
+      const [movedTicket] = columnTickets.splice(result.source.index, 1);
+      columnTickets.splice(result.destination.index, 0, movedTicket);
+
+      const newOrderIds = columnTickets.map(t => t.id);
+      const storageKey = `board-order-${projectId}-${fromStatus}`;
+      localStorage.setItem(storageKey, JSON.stringify(newOrderIds));
+      setOrderRevision(prev => prev + 1);
+      return;
+    }
+
     const ticket = boardTickets.find(t => t.id === result.draggableId);
     if (!ticket) return;
     setPendingMove({
@@ -279,6 +338,7 @@ const BoardPage = () => {
         </div>
         <div className="flex items-center gap-2">
           <TerraformFilterSelect value={terraformFilter} options={terraformOptions} onChange={setTerraformFilter} />
+          <DepartmentFilterPopover value={departmentFilter} onApply={setDepartmentFilter} />
           <TypeFilterPopover value={typeFilter} onApply={setTypeFilter} />
           <AssigneeFilterPopover users={availableUsers} value={assigneeFilter} onApply={setAssigneeFilter} />
         </div>

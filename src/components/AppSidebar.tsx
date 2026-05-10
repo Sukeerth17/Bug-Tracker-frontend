@@ -31,22 +31,57 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   const [newFeatureName, setNewFeatureName] = React.useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = React.useState(false);
   const [pendingDelete, setPendingDelete] = React.useState<{ projectId: string; featureId: string } | null>(null);
+  const retryTimerRef = React.useRef<number | null>(null);
 
   const currentProjectId = getProjectIdFromPathname(location.pathname) || projects[0]?.id || '';
 
-  const loadProjects = React.useCallback(() => {
-    projectApi.getProjects().then(setProjects).catch(() => setProjects([]));
+  const clearRetryTimer = React.useCallback(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleRetry = React.useCallback(() => {
+    if (retryTimerRef.current !== null) return;
+    retryTimerRef.current = window.setTimeout(() => {
+      retryTimerRef.current = null;
+      void loadProjects();
+    }, 2000);
+  }, []);
+
+  const loadProjects = React.useCallback(async () => {
+    try {
+      const rows = await projectApi.getProjects();
+      setProjects(rows);
+      clearRetryTimer();
+    } catch {
+      setProjects([]);
+      scheduleRetry();
+    }
   }, []);
 
   React.useEffect(() => {
-    loadProjects();
+    void loadProjects();
   }, [loadProjects, location.pathname]);
 
   React.useEffect(() => {
-    const handler = () => loadProjects();
+    const handler = () => { void loadProjects(); };
     window.addEventListener('projects:changed', handler);
     return () => window.removeEventListener('projects:changed', handler);
   }, [loadProjects]);
+
+  React.useEffect(() => {
+    const handler = () => { void loadProjects(); };
+    window.addEventListener('focus', handler);
+    window.addEventListener('online', handler);
+    return () => {
+      window.removeEventListener('focus', handler);
+      window.removeEventListener('online', handler);
+    };
+  }, [loadProjects]);
+
+  React.useEffect(() => () => clearRetryTimer(), [clearRetryTimer]);
 
   React.useEffect(() => {
     if (projects.length === 0) {

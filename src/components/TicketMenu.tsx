@@ -24,11 +24,15 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
   const [features, setFeatures] = useState<FeatureItem[]>([]);
   const [selectedId, setSelectedId] = useState(ticket.featureId ? String(ticket.featureId) : '');
   const [draftId, setDraftId] = useState(ticket.featureId ? String(ticket.featureId) : '');
+  const [selectedTitle, setSelectedTitle] = useState(ticket.title);
+  const [draftTitle, setDraftTitle] = useState(ticket.title);
 
   useEffect(() => {
     setSelectedId(ticket.featureId ? String(ticket.featureId) : '');
     setDraftId(ticket.featureId ? String(ticket.featureId) : '');
-  }, [ticket.featureId, ticket.id]);
+    setSelectedTitle(ticket.title);
+    setDraftTitle(ticket.title);
+  }, [ticket.featureId, ticket.id, ticket.title]);
 
   useEffect(() => {
     if (!open) return;
@@ -46,17 +50,22 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
 
   const handleFeatureSave = async () => {
     const dueDate = ticket.dueDate ? format(new Date(ticket.dueDate), 'yyyy-MM-dd') : null;
+    const trimmedTitle = draftTitle.trim();
+    if (!trimmedTitle) return;
     try {
       await updateTicketDetails(projectId || ticket.projectId, ticket.id, {
-        title: ticket.title,
+        title: trimmedTitle,
         description: ticket.description || '',
         dueDate,
         featureId: draftId ? Number(draftId) : null,
       });
       setSelectedId(draftId);
+      setSelectedTitle(trimmedTitle);
+      setDraftTitle(trimmedTitle);
       setOpen(false);
     } catch {
       setDraftId(selectedId);
+      setDraftTitle(selectedTitle);
     }
   };
 
@@ -105,14 +114,27 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
         </div>
         <DropdownMenuSeparator />
         <div className="px-2 pb-2">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">Title</label>
+          <input
+            value={draftTitle}
+            onChange={(event) => setDraftTitle(event.target.value)}
+            placeholder="Ticket title"
+            className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+          />
+        </div>
+        <DropdownMenuSeparator />
+        <div className="px-2 pb-2">
           <SearchableFeatureSelect features={features} value={draftId} onChange={setDraftId} label="Change feature" />
           <div className="mt-2 flex items-center justify-between gap-2">
-            <UnsavedChangesBadge visible={draftId !== selectedId} />
+            <UnsavedChangesBadge visible={draftId !== selectedId || draftTitle.trim() !== selectedTitle} />
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setDraftId(selectedId)}
-                disabled={draftId === selectedId}
+                onClick={() => {
+                  setDraftId(selectedId);
+                  setDraftTitle(selectedTitle);
+                }}
+                disabled={draftId === selectedId && draftTitle.trim() === selectedTitle}
                 className="h-8 rounded-md border px-3 text-xs disabled:opacity-60"
               >
                 Cancel
@@ -120,7 +142,7 @@ const TicketMenu = ({ ticket, projectId, className }: TicketMenuProps) => {
               <button
                 type="button"
                 onClick={() => void handleFeatureSave()}
-                disabled={draftId === selectedId}
+                disabled={(draftId === selectedId && draftTitle.trim() === selectedTitle) || !draftTitle.trim()}
                 className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground disabled:opacity-60"
               >
                 Apply
